@@ -22,7 +22,8 @@ REDIS_CLIENT=phpredis
 REDIS_URL=<redis_url_de_render>
 CACHE_STORE=redis
 SESSION_DRIVER=redis
-QUEUE_CONNECTION=sync
+QUEUE_CONNECTION=database
+DB_QUEUE=default
 ```
 
 ## Correo real
@@ -31,14 +32,18 @@ Para que los correos lleguen a una bandeja real, configura SMTP:
 
 ```env
 MAIL_MAILER=smtp
-MAIL_HOST=<smtp_host>
-MAIL_PORT=587
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=465
 MAIL_USERNAME=<smtp_user>
 MAIL_PASSWORD=<smtp_password>
 MAIL_FROM_ADDRESS=<correo_emisor>
 MAIL_FROM_NAME=FIEA
-MAIL_SCHEME=tls
+MAIL_SCHEME=smtps
+MAIL_TIMEOUT=30
 ```
+
+En Laravel 12 `MAIL_SCHEME` no acepta `tls`. Para Gmail usa `smtps` con puerto `465`.
+Si usas puerto `587`, el scheme debe ser `smtp`, pero en Render puede quedar bloqueado o lento por STARTTLS.
 
 ## Archivos
 
