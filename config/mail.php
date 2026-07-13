@@ -16,6 +16,8 @@ return [
 
     'default' => env('MAIL_MAILER', 'log'),
 
+    'invoice_queue_enabled' => env('FIEA_EMAIL_QUEUE_ENABLED', true),
+
     /*
     |--------------------------------------------------------------------------
     | Mailer Configurations

@@ -49,6 +49,8 @@ services:
         value: database
       - key: DB_QUEUE
         value: default
+      - key: FIEA_EMAIL_QUEUE_ENABLED
+        value: false
       - key: BROADCAST_CONNECTION
         value: log
       - key: FILESYSTEM_DISK

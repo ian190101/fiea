@@ -9,8 +9,10 @@ use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Invoice;
 use App\Models\InvoiceRecipient;
+use App\Services\InvoiceEmailDeliveryService;
 use App\Services\InvoiceEmailQueueService;
 use App\Services\InvoiceEmailTemplateService;
+use App\Services\InvoicePdfService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -162,6 +164,8 @@ class InvoiceEmailController extends Controller
     public function send(
         Request $request,
         InvoiceEmailQueueService $emailQueue,
+        InvoiceEmailDeliveryService $delivery,
+        InvoicePdfService $pdfs,
         EmailLog $emailLog
     ): RedirectResponse {
         $emailLog->loadMissing('invoice.pdfFile');
@@ -172,6 +176,22 @@ class InvoiceEmailController extends Controller
 
         if (! in_array($emailLog->status, ['pending', 'failed', 'queued'], true)) {
             return back()->withErrors(['email' => 'Solo se pueden enviar correos pendientes, en cola o fallidos.']);
+        }
+
+        if (! (bool) config('mail.invoice_queue_enabled', true)) {
+            if (! $emailLog->invoice->pdfFile) {
+                $pdfs->generate($emailLog->invoice, $request->user());
+                $emailLog->load('invoice.pdfFile');
+            }
+
+            $delivery->send($emailLog, $request->user(), $request->ip(), $request->userAgent());
+            $emailLog->refresh();
+
+            if ($emailLog->status === 'failed') {
+                return back()->withErrors(['email' => $emailLog->error_message ?: 'No se pudo enviar el correo.']);
+            }
+
+            return back()->with('success', 'Correo enviado correctamente.');
         }
 
         $emailQueue->enqueue($emailLog, $request->user(), $request->ip(), $request->userAgent());
