@@ -1,13 +1,27 @@
-FROM node:20-alpine AS assets
+FROM php:8.3-cli-alpine AS assets
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-COPY vite.config.js tailwind.config.js postcss.config.js jsconfig.json ./
-COPY resources ./resources
-COPY public ./public
+RUN apk add --no-cache git nodejs npm unzip
 
-RUN npm ci && npx vite build
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+COPY composer.json composer.lock package.json package-lock.json ./
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts --no-autoloader \
+    && npm ci
+
+COPY vite.config.js tailwind.config.js postcss.config.js jsconfig.json ./
+COPY app ./app
+COPY bootstrap ./bootstrap
+COPY config ./config
+COPY database ./database
+COPY resources ./resources
+COPY routes ./routes
+COPY public ./public
+COPY artisan ./artisan
+
+RUN composer dump-autoload --optimize \
+    && npm run build
 
 FROM php:8.3-apache AS app
 
@@ -39,17 +53,13 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts --no-autoloader
-
 COPY . .
+COPY --from=assets /app/vendor ./vendor
 COPY --from=assets /app/public/build ./public/build
 COPY docker/000-default.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/start.sh /usr/local/bin/start
 
-RUN composer dump-autoload --optimize \
+RUN php artisan package:discover --ansi \
     && chmod +x /usr/local/bin/start \
     && chown -R www-data:www-data storage bootstrap/cache \
     && find storage bootstrap/cache -type d -exec chmod 775 {} \; \
