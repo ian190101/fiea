@@ -41,11 +41,19 @@ services:
         value: redis
       - key: SESSION_DRIVER
         value: redis
+      - key: SESSION_SECURE_COOKIE
+        value: true
+      - key: SESSION_SAME_SITE
+        value: lax
       - key: QUEUE_CONNECTION
         value: sync
+      - key: BROADCAST_CONNECTION
+        value: log
       - key: FILESYSTEM_DISK
         value: local
       - key: MAIL_MAILER
+        sync: false
+      - key: MAIL_SCHEME
         sync: false
       - key: MAIL_HOST
         sync: false

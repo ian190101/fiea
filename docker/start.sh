@@ -13,6 +13,7 @@ fi
 
 if [ -z "${APP_KEY:-}" ]; then
     echo "APP_KEY no esta configurado. Define APP_KEY en Render antes de produccion." >&2
+    exit 1
 fi
 
 php artisan storage:link --force || true
