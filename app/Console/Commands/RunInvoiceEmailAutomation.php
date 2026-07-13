@@ -24,7 +24,7 @@ class RunInvoiceEmailAutomation extends Command
         );
 
         $this->info(sprintf(
-            'Automatizacion completada: %d preparados, %d enviados, %d reintentados, %d fallidos.',
+            'Automatizacion completada: %d preparados, %d encolados, %d reintentados, %d fallidos.',
             $summary['prepared'],
             $summary['sent'],
             $summary['retried'],

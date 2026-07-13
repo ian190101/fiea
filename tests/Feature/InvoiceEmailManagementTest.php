@@ -243,6 +243,7 @@ class InvoiceEmailManagementTest extends TestCase
 
     public function test_authenticated_users_can_send_prepared_invoice_email(): void
     {
+        Queue::fake();
         Mail::fake();
         Storage::fake('local');
 
@@ -266,6 +267,36 @@ class InvoiceEmailManagementTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
+        Queue::assertPushed(SendInvoiceEmailJob::class);
+        Mail::assertNothingSent();
+        $this->assertSame('queued', $emailLog->refresh()->status);
+    }
+
+    public function test_invoice_email_job_sends_prepared_invoice_email(): void
+    {
+        Mail::fake();
+        Storage::fake('local');
+
+        $user = User::factory()->create();
+        [$invoice, $contact] = $this->createInvoiceContext();
+        InvoiceRecipient::query()->create([
+            'invoice_id' => $invoice->id,
+            'contact_person_id' => $contact->id,
+            'email' => 'billing@example.com',
+            'recipient_type' => 'to',
+        ]);
+        $emailLog = EmailLog::query()->create([
+            'invoice_id' => $invoice->id,
+            'subject' => 'FIEA Invoice',
+            'body' => 'Hello, please find the invoice attached.',
+            'status' => 'queued',
+        ]);
+
+        (new SendInvoiceEmailJob($emailLog->id, $user->id))->handle(
+            app(\App\Services\InvoicePdfService::class),
+            app(\App\Services\InvoiceEmailDeliveryService::class),
+        );
+
         Mail::assertSent(InvoicePreparedMail::class, 1);
         $emailLog->refresh();
         $invoice->refresh();
@@ -284,6 +315,7 @@ class InvoiceEmailManagementTest extends TestCase
 
     public function test_sending_email_without_to_recipient_marks_log_as_failed(): void
     {
+        Queue::fake();
         Mail::fake();
 
         $user = User::factory()->create();
@@ -303,7 +335,40 @@ class InvoiceEmailManagementTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('invoice-emails.send', $emailLog->id))
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasNoErrors();
+
+        Mail::assertNothingSent();
+        Queue::assertPushed(SendInvoiceEmailJob::class);
+        $this->assertSame('queued', $emailLog->refresh()->status);
+    }
+
+    public function test_invoice_email_job_marks_log_as_failed_without_to_recipient(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create();
+        [$invoice] = $this->createInvoiceContext();
+        InvoiceRecipient::query()->create([
+            'invoice_id' => $invoice->id,
+            'contact_person_id' => null,
+            'email' => 'copy@example.com',
+            'recipient_type' => 'cc',
+        ]);
+        $emailLog = EmailLog::query()->create([
+            'invoice_id' => $invoice->id,
+            'subject' => 'FIEA Invoice',
+            'body' => 'Hello.',
+            'status' => 'queued',
+        ]);
+
+        try {
+            (new SendInvoiceEmailJob($emailLog->id, $user->id))->handle(
+                app(\App\Services\InvoicePdfService::class),
+                app(\App\Services\InvoiceEmailDeliveryService::class),
+            );
+        } catch (\RuntimeException) {
+            //
+        }
 
         Mail::assertNothingSent();
         $this->assertSame('failed', $emailLog->refresh()->status);
@@ -338,11 +403,11 @@ class InvoiceEmailManagementTest extends TestCase
         $this->actingAs($user)
             ->post(route('invoice-emails.send', $emailLog->id))
             ->assertSessionHasNoErrors()
-            ->assertSessionHas('success', 'Correo encolado correctamente.')
+            ->assertSessionHas('success', 'Correo encolado correctamente. Se enviara en segundo plano.')
             ->assertRedirect();
 
         Queue::assertPushed(SendInvoiceEmailJob::class);
-        $this->assertSame('pending', $emailLog->refresh()->status);
+        $this->assertSame('queued', $emailLog->refresh()->status);
     }
 
     /**

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Mail\InvoicePreparedMail;
+use App\Jobs\SendInvoiceEmailJob;
 use App\Models\Chapter;
 use App\Models\ChapterType;
 use App\Models\ContactPerson;
@@ -15,6 +15,7 @@ use App\Models\Team;
 use App\Models\TripPhase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -49,7 +50,7 @@ class InvoiceEmailAutomationTest extends TestCase
 
     public function test_command_sends_automated_pending_email(): void
     {
-        Mail::fake();
+        Queue::fake();
         Storage::fake('local');
 
         [$invoice, $contact] = $this->createInvoiceContext();
@@ -70,17 +71,16 @@ class InvoiceEmailAutomationTest extends TestCase
         $this->artisan('fiea:email-automation --send-pending')
             ->assertSuccessful();
 
-        Mail::assertSent(InvoicePreparedMail::class, 1);
+        Queue::assertPushed(SendInvoiceEmailJob::class);
 
-        $this->assertSame('sent', $emailLog->refresh()->status);
-        $this->assertNotNull($emailLog->sent_at);
-        $this->assertNotNull($emailLog->last_attempted_at);
+        $this->assertSame('queued', $emailLog->refresh()->status);
+        $this->assertNull($emailLog->sent_at);
         $this->assertNotNull($invoice->refresh()->pdf_file_id);
     }
 
     public function test_command_retries_due_failed_email(): void
     {
-        Mail::fake();
+        Queue::fake();
         Storage::fake('local');
 
         [$invoice, $contact] = $this->createInvoiceContext();
@@ -104,9 +104,9 @@ class InvoiceEmailAutomationTest extends TestCase
         $this->artisan('fiea:email-automation --retry-failed')
             ->assertSuccessful();
 
-        Mail::assertSent(InvoicePreparedMail::class, 1);
+        Queue::assertPushed(SendInvoiceEmailJob::class);
 
-        $this->assertSame('sent', $emailLog->refresh()->status);
+        $this->assertSame('queued', $emailLog->refresh()->status);
         $this->assertNull($emailLog->next_retry_at);
     }
 

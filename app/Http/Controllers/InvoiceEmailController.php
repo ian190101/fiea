@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\SendInvoiceEmailJob;
 use App\Models\AuditLog;
 use App\Models\ContactAssignment;
 use App\Models\ContactPerson;
@@ -10,10 +9,10 @@ use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Invoice;
 use App\Models\InvoiceRecipient;
+use App\Services\InvoiceEmailQueueService;
 use App\Services\InvoiceEmailTemplateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -66,12 +65,13 @@ class InvoiceEmailController extends Controller
     }
 
     /**
-     * @return array{automated_pending: int, failed_due: int, max_retry_exceeded: int}
+     * @return array{automated_pending: int, queued: int, failed_due: int, max_retry_exceeded: int}
      */
     private function automationSummary(): array
     {
         return $this->remember('automation-summary', 15, fn () => [
                 'automated_pending' => EmailLog::query()->where('source', 'automation')->where('status', 'pending')->count(),
+                'queued' => EmailLog::query()->where('status', 'queued')->count(),
                 'failed_due' => EmailLog::query()
                     ->where('status', 'failed')
                     ->where(function ($query) {
@@ -161,6 +161,7 @@ class InvoiceEmailController extends Controller
 
     public function send(
         Request $request,
+        InvoiceEmailQueueService $emailQueue,
         EmailLog $emailLog
     ): RedirectResponse {
         $emailLog->loadMissing('invoice.pdfFile');
@@ -169,28 +170,13 @@ class InvoiceEmailController extends Controller
             return back()->withErrors(['email' => 'El correo no tiene invoice relacionado.']);
         }
 
-        if (! in_array($emailLog->status, ['pending', 'failed'], true)) {
-            return back()->withErrors(['email' => 'Solo se pueden enviar correos pendientes o fallidos.']);
+        if (! in_array($emailLog->status, ['pending', 'failed', 'queued'], true)) {
+            return back()->withErrors(['email' => 'Solo se pueden enviar correos pendientes, en cola o fallidos.']);
         }
 
-        Bus::dispatch(new SendInvoiceEmailJob(
-            emailLogId: $emailLog->id,
-            userId: $request->user()?->id,
-            ipAddress: $request->ip(),
-            userAgent: $request->userAgent(),
-        ));
+        $emailQueue->enqueue($emailLog, $request->user(), $request->ip(), $request->userAgent());
 
-        $emailLog->refresh();
-
-        if (config('queue.default') !== 'sync') {
-            return back()->with('success', 'Correo encolado correctamente.');
-        }
-
-        if ($emailLog->status === 'failed') {
-            return back()->withErrors(['email' => $emailLog->error_message ?: 'No se pudo enviar el correo.']);
-        }
-
-        return back()->with('success', 'Correo enviado correctamente.');
+        return back()->with('success', 'Correo encolado correctamente. Se enviara en segundo plano.');
     }
 
     /**

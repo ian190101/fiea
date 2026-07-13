@@ -368,12 +368,13 @@ export default function InvoiceEmailIndex({ invoices = [], defaultMessages = {},
 function AutomationSummary({ summary }) {
     const cards = [
         { label: 'Automaticos pendientes', value: summary?.automated_pending ?? 0 },
+        { label: 'Correos en cola', value: summary?.queued ?? 0 },
         { label: 'Fallidos listos para reintento', value: summary?.failed_due ?? 0 },
         { label: 'Reintentos agotados', value: summary?.max_retry_exceeded ?? 0 },
     ];
 
     return (
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-4">
             {cards.map((card) => (
                 <div key={card.label} className="glass-panel rounded-[2rem] p-5">
                     <p className="text-sm font-bold text-app-muted">{card.label}</p>
@@ -547,11 +548,13 @@ function TemplatePanel({ templates, templateTokens, form, editingTemplate, onEdi
 function EmailStatusBadge({ status }) {
     const classes = {
         pending: 'bg-amber-400/20 text-amber-800 dark:text-amber-100',
+        queued: 'bg-sky-400/20 text-sky-800 dark:text-sky-100',
         sent: 'bg-emerald-400/20 text-emerald-800 dark:text-emerald-100',
         failed: 'bg-red-400/20 text-red-800 dark:text-red-100',
     };
     const labels = {
         pending: 'Pendiente',
+        queued: 'En cola',
         sent: 'Enviado',
         failed: 'Fallido',
     };

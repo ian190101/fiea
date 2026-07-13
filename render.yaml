@@ -46,7 +46,9 @@ services:
       - key: SESSION_SAME_SITE
         value: lax
       - key: QUEUE_CONNECTION
-        value: sync
+        value: database
+      - key: DB_QUEUE
+        value: default
       - key: BROADCAST_CONNECTION
         value: log
       - key: FILESYSTEM_DISK
@@ -54,7 +56,9 @@ services:
       - key: MAIL_MAILER
         sync: false
       - key: MAIL_SCHEME
-        sync: false
+        value: smtp
+      - key: MAIL_TIMEOUT
+        value: 10
       - key: MAIL_HOST
         sync: false
       - key: MAIL_PORT

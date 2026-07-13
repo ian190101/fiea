@@ -6,6 +6,7 @@ use App\Models\EmailLog;
 use App\Models\User;
 use App\Services\InvoiceEmailDeliveryService;
 use App\Services\InvoicePdfService;
+use DateTimeInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -13,7 +14,9 @@ class SendInvoiceEmailJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    public int $tries = 12;
+
+    public int $timeout = 120;
 
     public function __construct(
         private readonly int $emailLogId,
@@ -41,6 +44,19 @@ class SendInvoiceEmailJob implements ShouldQueue
             $emailLog->load('invoice.pdfFile');
         }
 
-        $delivery->send($emailLog, $user, $this->ipAddress, $this->userAgent);
+        $delivery->send($emailLog, $user, $this->ipAddress, $this->userAgent, throwOnFailure: true);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function backoff(): array
+    {
+        return [60, 300, 900, 1800, 3600];
+    }
+
+    public function retryUntil(): DateTimeInterface
+    {
+        return now()->addDays(2);
     }
 }

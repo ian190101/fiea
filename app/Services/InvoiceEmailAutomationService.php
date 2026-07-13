@@ -12,7 +12,7 @@ class InvoiceEmailAutomationService
     public function __construct(
         private readonly InvoiceEmailTemplateService $templates,
         private readonly InvoicePdfService $pdfs,
-        private readonly InvoiceEmailDeliveryService $delivery,
+        private readonly InvoiceEmailQueueService $queue,
     ) {
     }
 
@@ -34,15 +34,13 @@ class InvoiceEmailAutomationService
 
         if ($sendPending) {
             $sendSummary = $this->sendPendingAutomatedEmails();
-            $summary['sent'] += $sendSummary['sent'];
-            $summary['failed'] += $sendSummary['failed'];
+            $summary['sent'] += $sendSummary['queued'];
         }
 
         if ($retryFailed) {
             $retrySummary = $this->retryFailedEmails();
-            $summary['sent'] += $retrySummary['sent'];
+            $summary['sent'] += $retrySummary['queued'];
             $summary['retried'] += $retrySummary['retried'];
-            $summary['failed'] += $retrySummary['failed'];
         }
 
         return $summary;
@@ -97,11 +95,11 @@ class InvoiceEmailAutomationService
     }
 
     /**
-     * @return array{sent: int, failed: int}
+     * @return array{queued: int, failed: int}
      */
     public function sendPendingAutomatedEmails(): array
     {
-        $summary = ['sent' => 0, 'failed' => 0];
+        $summary = ['queued' => 0, 'failed' => 0];
 
         EmailLog::query()
             ->with('invoice.pdfFile')
@@ -111,10 +109,8 @@ class InvoiceEmailAutomationService
             ->chunkById(50, function ($logs) use (&$summary) {
                 foreach ($logs as $log) {
                     $this->ensurePdf($log);
-                    $this->delivery->send($log, null, null, 'system:email-automation');
-                    $log->refresh();
-
-                    $summary[$log->status === 'sent' ? 'sent' : 'failed']++;
+                    $this->queue->enqueue($log, null, null, 'system:email-automation');
+                    $summary['queued']++;
                 }
             });
 
@@ -122,11 +118,11 @@ class InvoiceEmailAutomationService
     }
 
     /**
-     * @return array{sent: int, retried: int, failed: int}
+     * @return array{queued: int, retried: int, failed: int}
      */
     public function retryFailedEmails(int $maxRetries = 3): array
     {
-        $summary = ['sent' => 0, 'retried' => 0, 'failed' => 0];
+        $summary = ['queued' => 0, 'retried' => 0, 'failed' => 0];
 
         EmailLog::query()
             ->with('invoice.pdfFile')
@@ -141,10 +137,8 @@ class InvoiceEmailAutomationService
                 foreach ($logs as $log) {
                     $summary['retried']++;
                     $this->ensurePdf($log);
-                    $this->delivery->send($log, null, null, 'system:email-automation');
-                    $log->refresh();
-
-                    $summary[$log->status === 'sent' ? 'sent' : 'failed']++;
+                    $this->queue->enqueue($log, null, null, 'system:email-automation');
+                    $summary['queued']++;
                 }
             });
 

@@ -25,4 +25,12 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+(
+    while true; do
+        php artisan queue:work "${QUEUE_CONNECTION:-database}" --queue=emails,default --sleep=3 --tries=12 --timeout=120 --backoff=60,300,900,1800,3600
+        echo "El worker de colas se detuvo; reiniciando en 5 segundos." >&2
+        sleep 5
+    done
+) &
+
 exec apache2-foreground

@@ -16,7 +16,7 @@ class InvoiceEmailDeliveryService
     {
     }
 
-    public function send(EmailLog $emailLog, ?User $user = null, ?string $ip = null, ?string $userAgent = null): void
+    public function send(EmailLog $emailLog, ?User $user = null, ?string $ip = null, ?string $userAgent = null, bool $throwOnFailure = false): void
     {
         $emailLog->loadMissing(['invoice.recipients', 'invoice.pdfFile']);
         $invoice = $emailLog->invoice;
@@ -69,6 +69,10 @@ class InvoiceEmailDeliveryService
             );
         } catch (Throwable $exception) {
             $this->markFailed($emailLog, $exception->getMessage(), $user, $ip, $userAgent);
+
+            if ($throwOnFailure) {
+                throw $exception;
+            }
         }
     }
 
