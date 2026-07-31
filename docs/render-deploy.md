@@ -1,6 +1,6 @@
 # Despliegue en Render con Docker
 
-Este proyecto usa `Dockerfile` y `render.yaml` para crear un web service simple en Render.
+Este proyecto usa `Dockerfile` y `render.yaml` para desplegar un web service y un worker separado.
 
 ## Variables obligatorias en Render
 
@@ -22,32 +22,34 @@ REDIS_CLIENT=phpredis
 REDIS_URL=<redis_url_de_render>
 CACHE_STORE=redis
 SESSION_DRIVER=redis
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=lax
+
 QUEUE_CONNECTION=database
 DB_QUEUE=default
+FIEA_EMAIL_QUEUE_ENABLED=true
 ```
 
 ## Correo real
 
-Para que los correos lleguen a una bandeja real, configura SMTP:
+Render bloquea SMTP en la practica para este caso. Los correos deben enviarse por API HTTPS con Resend.
+Configura el dominio en Resend y agrega SPF, DKIM y DMARC antes de usarlo en produccion.
 
 ```env
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=465
-MAIL_USERNAME=<smtp_user>
-MAIL_PASSWORD=<smtp_password>
+FIEA_MAIL_PROVIDER=resend
+RESEND_API_KEY=<resend_api_key>
+RESEND_TIMEOUT=30
+MAIL_MAILER=log
 MAIL_FROM_ADDRESS=<correo_emisor>
 MAIL_FROM_NAME=FIEA
-MAIL_SCHEME=smtps
-MAIL_TIMEOUT=30
 ```
 
-En Laravel 12 `MAIL_SCHEME` no acepta `tls`. Para Gmail usa `smtps` con puerto `465`.
-Si usas puerto `587`, el scheme debe ser `smtp`, pero en Render puede quedar bloqueado o lento por STARTTLS.
+Los correos oficiales se preparan siempre en ingles y pasan por `EmailLog` como outbox.
+El envio real lo procesa el worker de Render con la cola `emails`.
 
 ## Archivos
 
-El `render.yaml` deja `FILESYSTEM_DISK=local` para un primer despliegue simple. Para producción real con PDFs, recibos y logos persistentes, configura Cloudflare R2 y cambia:
+El disco local de Render no es persistente. Para produccion real con PDFs, recibos, logos y backups, usa Cloudflare R2:
 
 ```env
 FILESYSTEM_DISK=r2
@@ -58,6 +60,15 @@ CLOUDFLARE_R2_ENDPOINT=...
 CLOUDFLARE_R2_PUBLIC_URL=...
 ```
 
-## Migraciones
+## Migraciones y RBAC
 
-El contenedor ejecuta `php artisan migrate --force` al arrancar. Esto facilita el primer despliegue, pero en sistemas con mucho trafico conviene mover migraciones a un release step separado.
+El contenedor web ejecuta `php artisan migrate --force` al arrancar. Esto facilita el primer despliegue, pero en sistemas con mucho trafico conviene mover migraciones a un release step separado.
+
+Despues de migrar se ejecuta `php artisan fiea:rbac-seed-check`. Si los permisos o el rol `superadmin` estan incompletos, el deploy falla cerrado.
+
+## Operacion
+
+- El servicio web no ejecuta workers dentro del mismo proceso.
+- El worker `fiea-worker` procesa `emails,default`.
+- Rota cualquier secreto pegado accidentalmente en chats o logs: TiDB, Redis, Gmail/Resend y R2.
+- Ejecuta `php artisan fiea:production-check --fail-on-warning` antes de promover cambios importantes.

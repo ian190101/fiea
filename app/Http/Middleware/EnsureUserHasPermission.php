@@ -21,8 +21,8 @@ class EnsureUserHasPermission
             abort(403);
         }
 
-        // Permite que las pruebas y entornos recien migrados funcionen antes de sembrar RBAC.
-        if (!$this->rbacIsSeeded()) {
+        // Solo local/testing pueden arrancar sin RBAC sembrado; en produccion debe fallar cerrado.
+        if (!$this->rbacIsSeeded() && app()->environment(['local', 'testing'])) {
             return $next($request);
         }
 

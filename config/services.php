@@ -25,7 +25,13 @@ return [
     ],
 
     'resend' => [
-        'key' => env('RESEND_KEY'),
+        'key' => env('RESEND_API_KEY', env('RESEND_KEY')),
+        'endpoint' => env('RESEND_ENDPOINT', 'https://api.resend.com/emails'),
+        'timeout' => env('RESEND_TIMEOUT', 30),
+    ],
+
+    'transactional_mail' => [
+        'provider' => env('FIEA_MAIL_PROVIDER', 'resend'),
     ],
 
     'slack' => [

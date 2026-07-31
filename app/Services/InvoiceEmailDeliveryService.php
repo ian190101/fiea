@@ -2,18 +2,18 @@
 
 namespace App\Services;
 
-use App\Mail\InvoicePreparedMail;
 use App\Models\AuditLog;
 use App\Models\EmailLog;
 use App\Models\InvoiceRecipient;
 use App\Models\User;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class InvoiceEmailDeliveryService
 {
-    public function __construct(private readonly SystemNotificationService $notifications)
-    {
+    public function __construct(
+        private readonly SystemNotificationService $notifications,
+        private readonly TransactionalMailService $mail,
+    ) {
     }
 
     public function send(EmailLog $emailLog, ?User $user = null, ?string $ip = null, ?string $userAgent = null, bool $throwOnFailure = false): void
@@ -39,10 +39,12 @@ class InvoiceEmailDeliveryService
                 'last_attempted_at' => now(),
             ])->save();
 
-            Mail::to($to)
-                ->cc($this->emailsByType($recipients, 'cc'))
-                ->bcc($this->emailsByType($recipients, 'bcc'))
-                ->send(new InvoicePreparedMail($emailLog));
+            $providerMessageId = $this->mail->sendInvoice(
+                emailLog: $emailLog,
+                to: $to,
+                cc: $this->emailsByType($recipients, 'cc'),
+                bcc: $this->emailsByType($recipients, 'bcc'),
+            );
 
             $emailLog->forceFill([
                 'status' => 'sent',
@@ -56,7 +58,9 @@ class InvoiceEmailDeliveryService
                 'sent_at' => $invoice->sent_at ?? now(),
             ])->save();
 
-            $this->audit($emailLog, 'invoice_email_sent', $user, $ip, $userAgent);
+            $this->audit($emailLog, 'invoice_email_sent', $user, $ip, $userAgent, [
+                'provider_message_id' => $providerMessageId,
+            ]);
             $this->notifications->notifyPermission(
                 permission: 'invoice_emails.view',
                 type: 'invoice_email_sent',

@@ -50,26 +50,93 @@ services:
       - key: DB_QUEUE
         value: default
       - key: FIEA_EMAIL_QUEUE_ENABLED
-        value: false
+        value: true
       - key: BROADCAST_CONNECTION
         value: log
       - key: FILESYSTEM_DISK
-        value: local
-      - key: MAIL_MAILER
+        value: r2
+      - key: FIEA_MAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
         sync: false
-      - key: MAIL_SCHEME
-        value: smtps
-      - key: MAIL_TIMEOUT
+      - key: RESEND_TIMEOUT
         value: 30
-      - key: MAIL_HOST
-        sync: false
-      - key: MAIL_PORT
-        value: 465
-      - key: MAIL_USERNAME
-        sync: false
-      - key: MAIL_PASSWORD
-        sync: false
+      - key: MAIL_MAILER
+        value: log
       - key: MAIL_FROM_ADDRESS
         sync: false
       - key: MAIL_FROM_NAME
         value: FIEA
+      - key: CLOUDFLARE_R2_ACCESS_KEY_ID
+        sync: false
+      - key: CLOUDFLARE_R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: CLOUDFLARE_R2_BUCKET
+        sync: false
+      - key: CLOUDFLARE_R2_ENDPOINT
+        sync: false
+      - key: CLOUDFLARE_R2_PUBLIC_URL
+        sync: false
+  - type: worker
+    name: fiea-worker
+    runtime: docker
+    plan: starter
+    autoDeploy: true
+    dockerCommand: php artisan queue:work database --queue=emails,default --sleep=3 --tries=12 --timeout=120 --backoff=60,300,900,1800,3600
+    envVars:
+      - key: APP_NAME
+        value: FIEA
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_URL
+        sync: false
+      - key: APP_KEY
+        sync: false
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 4000
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: MYSQL_ATTR_SSL_CA
+        value: /etc/ssl/certs/ca-certificates.crt
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: DB_QUEUE
+        value: default
+      - key: FILESYSTEM_DISK
+        value: r2
+      - key: FIEA_MAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_TIMEOUT
+        value: 30
+      - key: MAIL_MAILER
+        value: log
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: FIEA
+      - key: CLOUDFLARE_R2_ACCESS_KEY_ID
+        sync: false
+      - key: CLOUDFLARE_R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: CLOUDFLARE_R2_BUCKET
+        sync: false
+      - key: CLOUDFLARE_R2_ENDPOINT
+        sync: false
+      - key: CLOUDFLARE_R2_PUBLIC_URL
+        sync: false

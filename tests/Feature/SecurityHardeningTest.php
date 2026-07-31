@@ -22,6 +22,15 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
     }
 
+    public function test_production_responses_include_content_security_policy(): void
+    {
+        app()->detectEnvironment(fn () => 'production');
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertHeader('Content-Security-Policy');
+    }
+
     public function test_hsts_header_is_only_sent_in_secure_production_requests(): void
     {
         app()->detectEnvironment(fn () => 'production');

@@ -219,6 +219,20 @@ class OperationHealthService
             $warnings[] = 'SESSION_ENCRYPT debe estar en true.';
         }
 
+        if (app()->environment('production') && config('filesystems.default') !== 'r2') {
+            $warnings[] = 'FILESYSTEM_DISK debe ser r2 para archivos persistentes.';
+        }
+
+        if (app()->environment('production') && config('queue.default') === 'sync') {
+            $warnings[] = 'QUEUE_CONNECTION debe usar database o redis.';
+        }
+
+        if (app()->environment('production')
+            && config('services.transactional_mail.provider') === 'resend'
+            && blank(config('services.resend.key'))) {
+            $warnings[] = 'RESEND_API_KEY debe estar configurado para correo transaccional.';
+        }
+
         return [
             'name' => 'Configuracion',
             'status' => empty($missing) && empty($warnings) ? 'ok' : 'warning',
@@ -230,6 +244,9 @@ class OperationHealthService
                 'debug' => (bool) config('app.debug'),
                 'session_secure_cookie' => (bool) config('session.secure'),
                 'session_encrypt' => (bool) config('session.encrypt'),
+                'filesystem_disk' => config('filesystems.default'),
+                'queue_connection' => config('queue.default'),
+                'mail_provider' => config('services.transactional_mail.provider'),
             ],
         ];
     }

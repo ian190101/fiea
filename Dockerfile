@@ -58,6 +58,7 @@ COPY --from=assets /app/vendor ./vendor
 COPY --from=assets /app/public/build ./public/build
 COPY docker/000-default.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/start.sh /usr/local/bin/start
+COPY docker/php-production.ini /usr/local/etc/php/conf.d/zz-production.ini
 
 RUN php artisan package:discover --ansi \
     && chmod +x /usr/local/bin/start \

@@ -15,10 +15,9 @@ use App\Models\Project;
 use App\Models\Team;
 use App\Models\TripPhase;
 use App\Models\User;
-use App\Mail\InvoicePreparedMail;
 use App\Jobs\SendInvoiceEmailJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -244,7 +243,6 @@ class InvoiceEmailManagementTest extends TestCase
     public function test_authenticated_users_can_send_prepared_invoice_email(): void
     {
         Queue::fake();
-        Mail::fake();
         Storage::fake('local');
 
         $user = User::factory()->create();
@@ -268,13 +266,15 @@ class InvoiceEmailManagementTest extends TestCase
             ->assertRedirect();
 
         Queue::assertPushed(SendInvoiceEmailJob::class);
-        Mail::assertNothingSent();
         $this->assertSame('queued', $emailLog->refresh()->status);
     }
 
     public function test_invoice_email_job_sends_prepared_invoice_email(): void
     {
-        Mail::fake();
+        Http::fake([
+            'api.resend.com/*' => Http::response(['id' => 'resend-message-1'], 200),
+        ]);
+        config(['services.resend.key' => 're_test_key']);
         Storage::fake('local');
 
         $user = User::factory()->create();
@@ -297,7 +297,10 @@ class InvoiceEmailManagementTest extends TestCase
             app(\App\Services\InvoiceEmailDeliveryService::class),
         );
 
-        Mail::assertSent(InvoicePreparedMail::class, 1);
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.resend.com/emails'
+            && $request['to'] === ['billing@example.com']
+            && $request['subject'] === 'FIEA Invoice'
+            && count($request['attachments'] ?? []) === 1);
         $emailLog->refresh();
         $invoice->refresh();
 
@@ -316,7 +319,6 @@ class InvoiceEmailManagementTest extends TestCase
     public function test_sending_email_without_to_recipient_marks_log_as_failed(): void
     {
         Queue::fake();
-        Mail::fake();
 
         $user = User::factory()->create();
         [$invoice] = $this->createInvoiceContext();
@@ -337,14 +339,13 @@ class InvoiceEmailManagementTest extends TestCase
             ->post(route('invoice-emails.send', $emailLog->id))
             ->assertSessionHasNoErrors();
 
-        Mail::assertNothingSent();
         Queue::assertPushed(SendInvoiceEmailJob::class);
         $this->assertSame('queued', $emailLog->refresh()->status);
     }
 
     public function test_invoice_email_job_marks_log_as_failed_without_to_recipient(): void
     {
-        Mail::fake();
+        Http::fake();
 
         $user = User::factory()->create();
         [$invoice] = $this->createInvoiceContext();
@@ -370,7 +371,7 @@ class InvoiceEmailManagementTest extends TestCase
             //
         }
 
-        Mail::assertNothingSent();
+        Http::assertNothingSent();
         $this->assertSame('failed', $emailLog->refresh()->status);
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'invoice_email_failed',
