@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -45,7 +45,7 @@ jobs:
         run: php artisan key:generate
 
       - name: Preparar Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -57,4 +57,8 @@ jobs:
         run: node --test tests/Frontend/*.test.mjs
 
       - name: Execute tests
-        run: vendor/bin/phpunit
+        run: mkdir -p build && vendor/bin/phpunit --log-junit build/phpunit.xml
+
+      - name: Publicar diagnóstico de pruebas
+        if: failure()
+        run: php .github/scripts/reportar-pruebas.php build/phpunit.xml
