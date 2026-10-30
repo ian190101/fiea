@@ -6,6 +6,18 @@ Antes de usar las direcciones predeterminadas, comprueba que `172.19.0.0/24`, `1
 
 La configuración privada reside fuera del repositorio, por defecto en `../fiea-shared`: `app.env`, `database.env` y `storage/`. Conserva las claves de aplicación y respaldos entre actualizaciones. Cada entorno usa contraseñas independientes para usuario y administrador de MySQL.
 
+MySQL exige TLS. Antes del arranque, prepara una CA privada y un certificado de servidor con `subjectAltName=DNS:db`. Guarda `ca.pem`, `server-cert.pem` y `server-key.pem` en `mysql-tls/`; el usuario `mysql` del contenedor debe poder leerlos. Conserva la clave de la CA fuera de ese montaje y fuera de los contenedores de aplicación. Copia únicamente el certificado público de la CA a `mysql-ca.pem` y configura `MYSQL_ATTR_SSL_CA=/run/fiea/mysql-ca.pem` en `app.env`.
+
+El cliente MariaDB instalado por la imagen lee `mysql-client.cnf`, montado en `/etc/mysql/conf.d/fiea.cnf`. Su contenido debe ser:
+
+```ini
+[client]
+ssl-ca=/run/fiea/mysql-ca.pem
+ssl-verify-server-cert=1
+```
+
+Así PDO y los respaldos verifican la cadena y el nombre del servidor. No desactives la validación TLS para aceptar certificados autofirmados. Incluye la CA, certificados, claves y configuración privada en la recuperación operativa y programa su renovación antes del vencimiento.
+
 La imagen se construye desde un commit publicado:
 
 ```bash

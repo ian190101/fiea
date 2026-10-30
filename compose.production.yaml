@@ -6,6 +6,8 @@ x-application: &application
     - ${FIEA_SHARED_DIR:-../fiea-shared}/app.env
   volumes:
     - ${FIEA_SHARED_DIR:-../fiea-shared}/storage:/var/www/html/storage
+    - ${FIEA_SHARED_DIR:-../fiea-shared}/mysql-ca.pem:/run/fiea/mysql-ca.pem:ro
+    - ${FIEA_SHARED_DIR:-../fiea-shared}/mysql-client.cnf:/etc/mysql/conf.d/fiea.cnf:ro
   networks:
     - application
   restart: unless-stopped
@@ -18,10 +20,12 @@ x-application: &application
 services:
   db:
     image: mysql:8.4
+    command: [--ssl-ca=/run/fiea-tls/ca.pem, --ssl-cert=/run/fiea-tls/server-cert.pem, --ssl-key=/run/fiea-tls/server-key.pem, --require-secure-transport=ON]
     env_file:
       - ${FIEA_SHARED_DIR:-../fiea-shared}/database.env
     volumes:
       - database:/var/lib/mysql
+      - ${FIEA_SHARED_DIR:-../fiea-shared}/mysql-tls:/run/fiea-tls:ro
     networks:
       - application
     restart: unless-stopped
