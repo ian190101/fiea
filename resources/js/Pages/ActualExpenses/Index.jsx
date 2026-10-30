@@ -1,3 +1,12 @@
+import { useOptionCollection } from '@/Utils/useOptionCollection';
+import CursorPager from '@/Components/CursorPager';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
+import WorkflowGuideCard from '@/Components/WorkflowGuideCard';
+import { workflows } from '@/Content/workflows';
+import { Link } from '@inertiajs/react';
+import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
@@ -9,21 +18,28 @@ import { useLocalTable } from '@/Utils/useLocalTable';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useCallback, useMemo, useState } from 'react';
 
-export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [], estimatedExpenses = [], expenseCategories = [] }) {
-    const { flash } = usePage().props;
+export default function ActualExpenseIndex({ actualExpenses: expensePage = [], tripPhases: initialtripPhases = [], estimatedExpenses: initialestimatedExpenses = [], expenseCategories = [], summary: serverSummary = null }) {
+    const tripPhases = useOptionCollection(initialtripPhases, 'trip-phases');
+    const estimatedExpenses = useOptionCollection(initialestimatedExpenses, 'estimated-expenses');
+    const actualExpenses = Array.isArray(expensePage) ? expensePage : expensePage.data ?? [];
+    const { flash, auth } = usePage().props;
     const [editingExpense, setEditingExpense] = useState(null);
-    const [phaseFilter, setPhaseFilter] = useState(tripPhases[0]?.id ?? '');
+    const [phaseFilter, setPhaseFilter] = useState('');
 
     const form = useForm({
         trip_phase_id: phaseFilter,
+        version: tripPhases[0]?.version ?? 1,
         estimated_expense_id: '',
         expense_category_id: expenseCategories[0]?.id ?? '',
         description: '',
         unit: '',
-        final_unit_cost: 0,
-        final_quantity: 1,
+        final_unit_cost: '0.0000',
+        final_quantity: '1.0000',
         receipt_number: '',
     });
+    const guard = useUnsavedChangesGuard(form.isDirty);
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
 
     const availableEstimated = useMemo(() => {
         if (!form.data.trip_phase_id) {
@@ -59,8 +75,8 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
         return estimatedExpenses.filter((expense) => String(expense.trip_phase_id) === String(phaseFilter));
     }, [estimatedExpenses, phaseFilter]);
 
-    const summary = useMemo(() => summarize(visibleExpenses, visibleEstimated), [visibleExpenses, visibleEstimated]);
-    const lineTotal = Number(form.data.final_unit_cost || 0) * Number(form.data.final_quantity || 0);
+    const summary = serverSummary && String(serverSummary.trip_phase_id ?? '') === String(phaseFilter)
+        ? serverSummary : { estimated: null, real: null, variance: null };
 
     const submit = (event) => {
         event.preventDefault();
@@ -84,12 +100,13 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
         form.clearErrors();
         form.setData({
             trip_phase_id: expense.trip_phase_id,
+            version: expense.trip_phase?.version ?? tripPhases.find((phase) => String(phase.id) === String(expense.trip_phase_id))?.version ?? 1,
             estimated_expense_id: expense.estimated_expense_id ?? '',
             expense_category_id: expense.expense_category_id,
             description: expense.description ?? '',
             unit: expense.unit ?? '',
-            final_unit_cost: expense.final_unit_cost ?? 0,
-            final_quantity: expense.final_quantity ?? 1,
+            final_unit_cost: expense.final_unit_cost ?? '0.0000',
+            final_quantity: expense.final_quantity ?? '1.0000',
             receipt_number: expense.receipt_number ?? '',
         });
     };
@@ -97,30 +114,32 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
     const resetForm = () => {
         setEditingExpense(null);
         form.clearErrors();
-        form.setData({
+        const next = {
             trip_phase_id: phaseFilter,
+            version: tripPhases.find((phase) => String(phase.id) === String(phaseFilter))?.version ?? 1,
             estimated_expense_id: '',
             expense_category_id: expenseCategories[0]?.id ?? '',
             description: '',
             unit: '',
-            final_unit_cost: 0,
-            final_quantity: 1,
+            final_unit_cost: '0.0000',
+            final_quantity: '1.0000',
             receipt_number: '',
-        });
+        };
+        form.setData(next);
+        form.setDefaults(next);
     };
 
-    const destroy = (expense) => {
-        if (!window.confirm(`Eliminar "${expense.description}"?`)) {
-            return;
-        }
-
-        router.delete(route('actual-expenses.destroy', expense.id), {
+    const destroy = (expense) => guard.request(() => setPendingDelete(expense));
+    const confirmDelete = () => {
+        if (!pendingDelete || deleteBusy) return;
+        setDeleteBusy(true);
+        router.delete(route('actual-expenses.destroy', pendingDelete.id), {
+            data: { version: pendingDelete.trip_phase?.version ?? tripPhases.find((phase) => String(phase.id) === String(pendingDelete.trip_phase_id))?.version ?? 1 },
             preserveScroll: true,
             onSuccess: () => {
-                if (editingExpense?.id === expense.id) {
-                    resetForm();
-                }
+                if (editingExpense?.id === pendingDelete.id) resetForm();
             },
+            onFinish: () => { setDeleteBusy(false); setPendingDelete(null); },
         });
     };
 
@@ -138,17 +157,18 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
             expense_category_id: estimated.expense_category_id,
             description: estimated.description ?? '',
             unit: estimated.unit ?? '',
-            final_unit_cost: estimated.initial_unit_cost ?? 0,
-            final_quantity: estimated.initial_quantity ?? 1,
+            final_unit_cost: estimated.initial_unit_cost ?? '0.0000',
+            final_quantity: estimated.initial_quantity ?? '1.0000',
         });
     };
 
-    const changePhaseFilter = (value) => {
+    const changePhaseFilter = (value) => guard.request(() => {
         setPhaseFilter(value);
+        router.get(route('actual-expenses.index'),value?{trip_phase_id:value}:{},{preserveState:true,preserveScroll:true});
         if (!editingExpense) {
-            form.setData('trip_phase_id', value);
+            form.setData({ ...form.data, trip_phase_id: value, version: tripPhases.find((phase) => String(phase.id) === String(value))?.version ?? 1 });
         }
-    };
+    });
 
     return (
         <AuthenticatedLayout
@@ -167,12 +187,16 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
+                <CursorPager page={expensePage} label="gastos reales" />
+
+                <WorkflowGuideCard guideKey="budget" userId={auth.user.id} title="Del presupuesto al cierre" steps={workflows.budget} />
+                {phaseFilter && <Link href={`/trip-phases/${phaseFilter}/budget?view=draft&invoice_type=IC&stage=final`} className="glass-button px-4">Abrir matriz Final</Link>}
 
                 <div className="grid gap-4 md:grid-cols-4">
                     <MetricCard label="Estimado" value={formatMoney(summary.estimated)} />
                     <MetricCard label="Real" value={formatMoney(summary.real)} />
-                    <MetricCard label="Variacion" value={formatMoney(summary.variance)} tone={summary.variance > 0 ? 'bad' : 'ok'} />
-                    <MetricCard label="Lineas reales" value={summary.count} />
+                    <MetricCard label="Variacion" value={formatMoney(summary.variance)} tone={moneySign(summary.variance) === 1 ? 'bad' : 'ok'} />
+                    <MetricCard label="Líneas reales visibles" value={visibleExpenses.length} />
                 </div>
 
                 <section className="grid gap-6 xl:grid-cols-[410px_1fr]">
@@ -194,15 +218,14 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
                                 options={tripPhases.map((phase) => ({ id: phase.id, name: phaseLabel(phase) }))}
                                 error={form.errors.trip_phase_id}
                                 onChange={(value) => {
-                                    form.setData('trip_phase_id', value);
-                                    if (!estimatedExpenses.some((expense) => String(expense.id) === String(form.data.estimated_expense_id) && String(expense.trip_phase_id) === String(value))) {
-                                        form.setData('estimated_expense_id', '');
-                                    }
+                                    const estimateValid = estimatedExpenses.some((expense) => String(expense.id) === String(form.data.estimated_expense_id) && String(expense.trip_phase_id) === String(value));
+                                    form.setData({ ...form.data, trip_phase_id: value, version: tripPhases.find((phase) => String(phase.id) === String(value))?.version ?? 1, estimated_expense_id: estimateValid ? form.data.estimated_expense_id : '' });
                                 }}
                             />
 
                             <SelectField
                                 id="estimated_expense_id"
+                                remoteParams={{trip_phase_id:form.data.trip_phase_id || undefined}}
                                 label="Linea estimada opcional"
                                 value={form.data.estimated_expense_id}
                                 options={availableEstimated.map((expense) => ({ id: expense.id, name: `${expense.description} - ${formatMoney(expense.estimated_total)}` }))}
@@ -266,7 +289,7 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
                             />
 
                             <div className="rounded-2xl bg-white/30 px-4 py-3 text-sm font-black text-app-text dark:bg-white/10">
-                                Total calculado: {formatMoney(lineTotal)}
+                                Total calculado por el servidor al guardar
                             </div>
                         </div>
 
@@ -289,7 +312,7 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
                                     <h2 className="text-xl font-black">Gastos registrados</h2>
                                     <p className="text-sm text-app-muted">{visibleExpenses.length} de {actualExpenses.length} lineas</p>
                                 </div>
-                                <select
+                                <LiquidSelect
                                     value={phaseFilter}
                                     onChange={(event) => changePhaseFilter(event.target.value)}
                                     className="ios-field text-sm font-bold"
@@ -300,7 +323,7 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
                                             {phaseLabel(phase)}
                                         </option>
                                     ))}
-                                </select>
+                                </LiquidSelect>
                             </div>
                             <TableControls
                                 query={table.query}
@@ -345,7 +368,7 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
                                                 <div className="text-xs text-app-muted">{expense.trip_phase?.project?.code ?? '-'}</div>
                                             </td>
                                             <td className="px-5 py-4 text-right font-black">{formatMoney(expense.real_total)}</td>
-                                            <td className="px-5 py-4 text-right">{formatMoney(expense.estimated_expense?.estimated_total ?? 0)}</td>
+                                            <td className="px-5 py-4 text-right">{formatMoney(expense.estimated_expense?.estimated_total ?? null)}</td>
                                             <td className="px-5 py-4">
                                                 <div>{expense.receipt_number || '-'}</div>
                                                 <div className="text-xs text-app-muted">{expense.receipts_count} archivos</div>
@@ -371,6 +394,10 @@ export default function ActualExpenseIndex({ actualExpenses = [], tripPhases = [
                     </div>
                 </section>
             </div>
+            <FinancialActionSheet open={Boolean(pendingDelete)} busy={deleteBusy} title="Eliminar registro"
+                description={pendingDelete ? `Se eliminará «${pendingDelete.description}». Confirma solo si corresponde a un borrador.` : ''}
+                confirmLabel="Eliminar" onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
+            <FinancialActionSheet {...guard.dialogProps} />
         </AuthenticatedLayout>
     );
 }
@@ -409,11 +436,12 @@ function MetricCard({ label, value, tone = 'neutral' }) {
     );
 }
 
-function SelectField({ id, label, value, options, error, onChange, emptyLabel = 'Seleccionar' }) {
+function SelectField({ id, label, value, options, error, onChange, remoteParams, emptyLabel = 'Seleccionar' }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
+                remoteParams={remoteParams}
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -425,7 +453,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
                         {option.name}
                     </option>
                 ))}
-            </select>
+            </LiquidSelect>
             <InputError message={error} className="mt-2" />
         </div>
     );
@@ -448,25 +476,7 @@ function TextField({ id, label, value, error, onChange, type = 'text', step }) {
     );
 }
 
-function summarize(actualExpenses, estimatedExpenses) {
-    const real = actualExpenses.reduce((total, expense) => total + Number(expense.real_total ?? 0), 0);
-    const estimated = estimatedExpenses.reduce((total, expense) => total + Number(expense.estimated_total ?? 0), 0);
-
-    return {
-        estimated,
-        real,
-        variance: real - estimated,
-        count: actualExpenses.length,
-    };
-}
 
 function phaseLabel(phase) {
     return `${phase.project?.code ?? 'Sin proyecto'} - ${phase.phase} (${phase.team?.name ?? 'Sin equipo'})`;
-}
-
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
 }

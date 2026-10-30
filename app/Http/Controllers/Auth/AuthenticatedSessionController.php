@@ -33,6 +33,7 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+        $request->session()->put('password_hash_web', $request->user()->getAuthPassword());
         $request->user()->forceFill([
             'last_login_at' => now(),
             'last_login_ip' => $request->ip(),

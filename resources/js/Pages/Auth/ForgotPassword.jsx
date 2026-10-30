@@ -1,10 +1,13 @@
+import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
+import { useRef } from 'react';
 
 export default function ForgotPassword({ status }) {
+    const formRef = useRef(null);
     const { data, setData, post, processing, errors } = useForm({
         email: '',
     });
@@ -12,28 +15,32 @@ export default function ForgotPassword({ status }) {
     const submit = (e) => {
         e.preventDefault();
 
-        post(route('password.email'));
+        post(route('password.email'), {
+            onError: () => requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus()),
+        });
     };
 
     return (
         <GuestLayout>
-            <Head title="Forgot Password" />
+            <Head title="Recuperar contraseña" />
 
             <div className="mb-4 text-sm text-gray-600">
-                Forgot your password? No problem. Just let us know your email
-                address and we will email you a password reset link that will
-                allow you to choose a new one.
+                Si existe una cuenta asociada a este correo, enviaremos un enlace para cambiar la contraseña.
             </div>
 
             {status && (
-                <div className="mb-4 text-sm font-medium text-green-600">
+                <div role="status" aria-live="polite" className="mb-4 text-sm font-medium text-green-700">
                     {status}
                 </div>
             )}
 
-            <form onSubmit={submit}>
+            {Object.keys(errors).length > 0 && <p role="alert" className="mb-4 text-sm font-semibold text-red-700 dark:text-red-200">Revisa el correo indicado.</p>}
+            <form ref={formRef} onSubmit={submit}>
+                <InputLabel htmlFor="email" className="block text-sm font-semibold">Correo electrónico</InputLabel>
                 <TextInput
                     id="email"
+                        aria-invalid={Boolean(errors.email)}
+                        aria-describedby={errors.email ? "email-error" : undefined}
                     type="email"
                     name="email"
                     value={data.email}
@@ -42,11 +49,11 @@ export default function ForgotPassword({ status }) {
                     onChange={(e) => setData('email', e.target.value)}
                 />
 
-                <InputError message={errors.email} className="mt-2" />
+                <InputError id="email-error" message={errors.email} className="mt-2" />
 
                 <div className="mt-4 flex items-center justify-end">
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Email Password Reset Link
+                    <PrimaryButton type="submit" className="ms-4" disabled={processing}>
+                        Enviar enlace de recuperación
                     </PrimaryButton>
                 </div>
             </form>

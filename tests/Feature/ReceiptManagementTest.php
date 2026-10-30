@@ -14,6 +14,8 @@ use App\Models\StorageFile;
 use App\Models\Team;
 use App\Models\TripPhase;
 use App\Models\User;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -31,7 +33,7 @@ class ReceiptManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_receipts(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
 
         $this->actingAs($user)
             ->get('/recibos')
@@ -42,16 +44,17 @@ class ReceiptManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $actualExpense = $this->createActualExpense($user);
         $file = UploadedFile::fake()->create('receipt.pdf', 12, 'application/pdf');
 
         $this->actingAs($user)
             ->post(route('receipts.store'), [
                 'actual_expense_id' => $actualExpense->id,
+                'version' => $actualExpense->tripPhase->version,
                 'receipt_number' => 'RCPT-001',
                 'issued_on' => '2026-07-12',
-                'amount' => 520,
+                'amount' => '520.00',
                 'file' => $file,
             ])
             ->assertSessionHasNoErrors()
@@ -71,16 +74,17 @@ class ReceiptManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $actualExpense = $this->createActualExpense($user);
         $file = UploadedFile::fake()->create('receipt.exe', 10, 'application/octet-stream');
 
         $this->actingAs($user)
             ->post(route('receipts.store'), [
                 'actual_expense_id' => $actualExpense->id,
+                'version' => $actualExpense->tripPhase->version,
                 'receipt_number' => null,
                 'issued_on' => null,
-                'amount' => 10,
+                'amount' => '10.00',
                 'file' => $file,
             ])
             ->assertSessionHasErrors('file');
@@ -90,14 +94,15 @@ class ReceiptManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $receipt = $this->createReceipt($user);
 
         $this->actingAs($user)
             ->patch(route('receipts.update', $receipt->id), [
+                'version' => $receipt->actualExpense->tripPhase->version,
                 'receipt_number' => 'RCPT-UPDATED',
                 'issued_on' => '2026-07-20',
-                'amount' => 600,
+                'amount' => '600.00',
             ])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
@@ -113,7 +118,7 @@ class ReceiptManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $receipt = $this->createReceipt($user);
 
         $this->actingAs($user)
@@ -125,19 +130,37 @@ class ReceiptManagementTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $receipt = $this->createReceipt($user);
         $objectKey = $receipt->storageFile->object_key;
         $storageFileId = $receipt->storage_file_id;
 
         $this->actingAs($user)
-            ->delete(route('receipts.destroy', $receipt->id))
+            ->delete(route('receipts.destroy', $receipt->id), [
+                'version' => $receipt->actualExpense->tripPhase->version,
+            ])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
         $this->assertDatabaseMissing('receipts', ['id' => $receipt->id]);
-        $this->assertDatabaseMissing('storage_files', ['id' => $storageFileId]);
-        Storage::disk('local')->assertMissing($objectKey);
+        $this->assertDatabaseHas('storage_files', ['id' => $storageFileId]);
+        $this->assertDatabaseHas('outbox_events', ['dedup_key' => 'storage-delete:'.$storageFileId]);
+        Storage::disk('local')->assertExists($objectKey);
+    }
+
+    private function authorizedUser(): User
+    {
+        $user = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $user->forceFill(['scope_all' => true])->save();
+        $role = Role::query()->firstOrCreate(['code' => 'receipts_test'], ['name' => 'Recibos prueba']);
+        foreach (['receipts.view', 'receipts.manage'] as $code) {
+            $permission = Permission::query()->firstOrCreate(['code' => $code], [
+                'module' => 'receipts', 'name' => $code,
+            ]);
+            $role->permissions()->syncWithoutDetaching([$permission->id]);
+        }
+        $user->roles()->attach($role);
+        return $user;
     }
 
     private function createReceipt(User $user): Receipt

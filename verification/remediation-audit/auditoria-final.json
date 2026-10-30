@@ -1,0 +1,88 @@
+{
+  "fecha_utc": "2026-10-30T14:41:59.608146+00:00",
+  "incidencias": 100,
+  "subsanadas": 100,
+  "pendientes": 0,
+  "php": {
+    "auditoria_integral": {
+      "archivo": "actual.xml",
+      "tests": 268,
+      "assertions": 1507,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "suite_ordinaria": {
+      "archivo": "existente-actual.xml",
+      "tests": 249,
+      "assertions": 1107,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "casos_php": 517,
+  "aserciones_php": 2614,
+  "casos_navegador": 24,
+  "casos_navegador_con_inertia_real": 8,
+  "casos_unitarios_js": 8,
+  "navegador": {
+    "inertia-real.json": 4,
+    "controles-finales-frontend.json": 4,
+    "importacion-frontend.json": 3,
+    "ambito-frontend.json": 3,
+    "verification\\appearance-audit\\resultados-frontend.json": 10
+  },
+  "dependencias": {
+    "casos": 4,
+    "conformes": 4,
+    "fallos_contrato": 0,
+    "errores_ejecucion": 0,
+    "composer_avisos": 0,
+    "npm_avisos": 0,
+    "paquetes_php_verificados": 127,
+    "dependencias_js_directas_verificadas": 16,
+    "archivos_bloqueo": {
+      "composer.lock": "9dc9d42ff491c5c7ef9e2c185ee10f878296ef1b668c35cf7e74d8a40484566b",
+      "package-lock.json": "5d591dac312770ccbc5bd11f10e2f8fe445d4b3cfd8bd038aaae5b9334ded8fa"
+    },
+    "fuentes": [
+      "composer-audit.json",
+      "npm-audit.json"
+    ],
+    "alcance": "Consultas oficiales guardadas después de las actualizaciones; sin omitir dependencias de desarrollo ni suprimir avisos."
+  },
+  "excel_originales_sin_cambios": [
+    {
+      "archivo": "C:\\Users\\Ian\\Downloads\\CONTROL INGRESOS INVOICES.xlsx",
+      "sha256": "984a12d3bb5613f43fbb48c2f735089a378fbb97680f2692e94854030f4c01db",
+      "hojas": [
+        "2025",
+        "2026"
+      ]
+    },
+    {
+      "archivo": "C:\\Users\\Ian\\Downloads\\DraftBudget_10July_SantaRosaCerritos_EWBMissouriST (1).xlsx",
+      "sha256": "7b38be6fc1e7beeb087ee6c2140c7428522e27d17fa3785d58826a855e5f22b7",
+      "hojas": [
+        "MASTER TEMPLATE",
+        "DRAFT BUDGET for Team",
+        "IN-COUNTRY Initial Invoice",
+        "IN-COUNTRY Final Invoice",
+        "MATERIALS Initial Invoice",
+        "MATERIALS Final Invoice"
+      ]
+    }
+  ],
+  "datos_locales_conservados": true,
+  "formato_php": "aprobado",
+  "compilacion": "aprobada",
+  "diff_check": "aprobado",
+  "limites": [
+    "PHP y restauración SQLite en bases aisladas; no se hicieron pagos, envíos ni respaldos operativos reales.",
+    "En navegador se intercepta HTTP; 8 casos utilizan el SDK real de Inertia y 16 simulan su contexto.",
+    "La comprobación de fórmulas usa un evaluador limitado; no constituye recálculo nativo de Excel.",
+    "Las inconsistencias del origen no se corrigen alterando importes ni Excel: se conservan y rechazan de forma explícita.",
+    "Se utilizó el árbol existente de Graphify; no se presenta como reindexado después de los cambios."
+  ]
+}

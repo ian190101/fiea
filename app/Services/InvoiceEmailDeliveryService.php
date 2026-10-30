@@ -2,10 +2,15 @@
 
 namespace App\Services;
 
+use App\Exceptions\MailPreparationException;
 use App\Models\AuditLog;
 use App\Models\EmailLog;
+use App\Models\Invoice;
 use App\Models\InvoiceRecipient;
 use App\Models\User;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Throwable;
 
 class InvoiceEmailDeliveryService
@@ -13,24 +18,33 @@ class InvoiceEmailDeliveryService
     public function __construct(
         private readonly SystemNotificationService $notifications,
         private readonly TransactionalMailService $mail,
-    ) {
-    }
+    ) {}
 
     public function send(EmailLog $emailLog, ?User $user = null, ?string $ip = null, ?string $userAgent = null, bool $throwOnFailure = false): void
     {
-        $emailLog->loadMissing(['invoice.recipients', 'invoice.pdfFile']);
+        $emailLog->loadMissing(['invoice']);
         $invoice = $emailLog->invoice;
 
         if (! $invoice) {
             $this->markFailed($emailLog, 'El correo no tiene invoice relacionado.', $user, $ip, $userAgent);
+
             return;
         }
 
-        $recipients = $invoice->recipients;
+        if (! $emailLog->delivery_key || ! $emailLog->recipients_snapshot || ! $emailLog->attachment_snapshot) {
+            abort(409, 'El correo legado requiere una nueva preparación revisada.');
+        }
+        if ($emailLog->status === 'sent' || $emailLog->status === 'unknown') {
+            return;
+        }
+        abort_if($emailLog->dispatch_deadline && now()->greaterThan($emailLog->dispatch_deadline), 409,
+            'Venció la ventana de despacho; revisa el estado con el proveedor.');
+        $recipients = collect($emailLog->recipients_snapshot);
         $to = $this->emailsByType($recipients, 'to');
 
         if ($to === []) {
             $this->markFailed($emailLog, 'Debe existir al menos un destinatario principal TO.', $user, $ip, $userAgent);
+
             return;
         }
 
@@ -46,34 +60,48 @@ class InvoiceEmailDeliveryService
                 bcc: $this->emailsByType($recipients, 'bcc'),
             );
 
-            $emailLog->forceFill([
-                'status' => 'sent',
-                'error_message' => null,
-                'next_retry_at' => null,
-                'sent_at' => now(),
-            ])->save();
-
-            $invoice->forceFill([
-                'status' => $invoice->status === 'approved' ? 'sent' : $invoice->status,
-                'sent_at' => $invoice->sent_at ?? now(),
-            ])->save();
-
-            $this->audit($emailLog, 'invoice_email_sent', $user, $ip, $userAgent, [
-                'provider_message_id' => $providerMessageId,
-            ]);
-            $this->notifications->notifyPermission(
-                permission: 'invoice_emails.view',
-                type: 'invoice_email_sent',
-                severity: 'info',
-                title: 'Correo de invoice enviado',
-                body: "El correo de {$invoice->code} fue enviado correctamente.",
-                actionUrl: route('invoice-emails.index'),
-                actor: $user,
-                data: ['invoice_id' => $invoice->id, 'email_log_id' => $emailLog->id],
-            );
+            if ($providerMessageId === '') {
+                throw new \RuntimeException('El proveedor no devolvió identificador.');
+            }
+            DB::transaction(function () use ($emailLog, $invoice, $providerMessageId, $user, $ip, $userAgent): void {
+                $locked = EmailLog::query()->lockForUpdate()->findOrFail($emailLog->id);
+                $locked->forceFill(['status' => 'sent', 'error_message' => null,
+                    'next_retry_at' => null, 'sent_at' => now(),
+                    'provider_message_id' => $providerMessageId])->save();
+                $current = Invoice::query()->lockForUpdate()->findOrFail($invoice->id);
+                $current->forceFill(['status' => $current->status === 'approved' ? 'sent' : $current->status,
+                    'sent_at' => $current->sent_at ?? now()])->save();
+                $this->audit($locked, 'invoice_email_sent', $user, $ip, $userAgent,
+                    ['provider_message_id' => $providerMessageId]);
+            });
+            try {
+                $this->notifications->notifyPermission(
+                    permission: 'invoice_emails.view', type: 'invoice_email_sent',
+                    severity: 'info', title: 'Correo de invoice enviado',
+                    body: "El correo de {$invoice->code} fue enviado correctamente.",
+                    actionUrl: route('invoice-emails.index'), actor: $user,
+                    data: ['invoice_id' => $invoice->id, 'email_log_id' => $emailLog->id],
+                );
+            } catch (Throwable $notificationError) {
+                report($notificationError);
+            }
         } catch (Throwable $exception) {
-            $this->markFailed($emailLog, $exception->getMessage(), $user, $ip, $userAgent);
+            if ($exception instanceof MailPreparationException) {
+                $this->markFailed($emailLog, 'No se completó la preparación local; no se inició el envío.', $user, $ip, $userAgent);
+                report($exception);
+                if ($throwOnFailure) {
+                    throw $exception;
+                }
 
+                return;
+            }
+            // Tras una llamada HTTP ambigua se bloquea el reenvío automático.
+            $reference = (string) Str::uuid();
+            $emailLog->forceFill(['status' => 'unknown', 'error_message' => $reference,
+                'next_retry_at' => null, 'last_attempted_at' => now()])->save();
+            report($exception);
+            $this->audit($emailLog, 'invoice_email_unknown', $user, $ip, $userAgent,
+                ['error_reference' => $reference]);
             if ($throwOnFailure) {
                 throw $exception;
             }
@@ -81,7 +109,7 @@ class InvoiceEmailDeliveryService
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, InvoiceRecipient> $recipients
+     * @param  Collection<int, InvoiceRecipient>  $recipients
      * @return array<int, string>
      */
     private function emailsByType($recipients, string $type): array
@@ -131,7 +159,7 @@ class InvoiceEmailDeliveryService
     }
 
     /**
-     * @param array<string, mixed> $extra
+     * @param  array<string, mixed>  $extra
      */
     private function audit(EmailLog $emailLog, string $action, ?User $user, ?string $ip, ?string $userAgent, array $extra = []): void
     {

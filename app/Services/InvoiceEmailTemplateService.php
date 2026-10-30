@@ -56,13 +56,15 @@ class InvoiceEmailTemplateService
      */
     private function tokens(Invoice $invoice): array
     {
+        $metadata = $invoice->snapshot['metadata'] ?? [];
+
         return [
             '{{invoice_code}}' => (string) $invoice->code,
             '{{invoice_type}}' => (string) $invoice->type,
             '{{stage}}' => $invoice->stage === 'final' ? 'Final' : 'Initial',
-            '{{project_code}}' => (string) ($invoice->tripPhase?->project?->code ?? ''),
-            '{{project_name}}' => (string) ($invoice->tripPhase?->project?->name ?? ''),
-            '{{team_name}}' => (string) ($invoice->tripPhase?->team?->name ?? ''),
+            '{{project_code}}' => (string) ($metadata['project_code'] ?? $invoice->tripPhase?->project?->code ?? ''),
+            '{{project_name}}' => (string) ($metadata['project_name'] ?? $invoice->tripPhase?->project?->name ?? ''),
+            '{{team_name}}' => (string) ($metadata['team_name'] ?? $invoice->tripPhase?->team?->name ?? ''),
             '{{grand_total}}' => $this->money($invoice->grand_total),
             '{{total_dr}}' => $this->money($invoice->total_dr),
             '{{total_wodr}}' => $this->money($invoice->total_wodr),

@@ -6,6 +6,7 @@ use App\Models\BackupRun;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Contracts\DatabaseSnapshotWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -38,11 +39,10 @@ class BackupManagementTest extends TestCase
 
     public function test_users_with_permission_can_create_database_backup(): void
     {
-        config(['filesystems.default' => 'local']);
-        Storage::fake('local');
+        $this->fakeSnapshotWriter();
         $user = $this->userWithPermission('backups.manage');
 
-        $this->actingAs($user)
+        $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()])
             ->post(route('backups.store'))
             ->assertSessionHasNoErrors()
             ->assertRedirect();
@@ -56,29 +56,27 @@ class BackupManagementTest extends TestCase
         Storage::disk('local')->assertExists($backup->storageFile->object_key);
 
         $contents = Storage::disk('local')->get($backup->storageFile->object_key);
-        $this->assertStringContainsString('FIEA database backup', $contents);
-        $this->assertStringContainsString('CREATE TABLE', $contents);
+        $this->assertStringStartsWith('FIEA-BACKUP-1', $contents);
+        $this->assertStringNotContainsString('CREATE TABLE', $contents);
     }
 
     public function test_completed_backup_can_be_downloaded(): void
     {
-        config(['filesystems.default' => 'local']);
-        Storage::fake('local');
+        $this->fakeSnapshotWriter();
         $user = $this->userWithPermission('backups.manage');
 
-        $this->actingAs($user)->post(route('backups.store'));
+        $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()])->post(route('backups.store'));
         $backup = BackupRun::query()->firstOrFail();
 
         $this->actingAs($user)
             ->get(route('backups.show', $backup))
             ->assertOk()
-            ->assertHeader('content-type', 'application/sql');
+            ->assertHeader('content-type', 'application/octet-stream');
     }
 
     public function test_backup_command_creates_database_backup(): void
     {
-        config(['filesystems.default' => 'local']);
-        Storage::fake('local');
+        $this->fakeSnapshotWriter();
 
         $this->artisan('fiea:backup-database')
             ->expectsOutputToContain('Backup generado correctamente.')
@@ -101,9 +99,30 @@ class BackupManagementTest extends TestCase
             'description' => null,
         ]);
         $role->permissions()->attach($permission);
+        if ($code === 'backups.manage') {
+            $view = Permission::query()->create(['code' => 'backups.view',
+                'module' => 'backups', 'name' => 'backups.view']);
+            $role->permissions()->attach($view);
+        }
         $user = User::factory()->create();
+        $user->forceFill(['scope_all' => true])->save();
         $user->roles()->attach($role);
 
         return $user;
+    }
+
+    private function fakeSnapshotWriter(): void
+    {
+        Storage::fake('local');
+        config()->set('filesystems.default', 'local');
+        config()->set('services.backup.encryption_key', base64_encode(random_bytes(32)));
+        $this->app->instance(DatabaseSnapshotWriter::class, new class implements DatabaseSnapshotWriter {
+            public function write(): string
+            {
+                $path = tempnam(sys_get_temp_dir(), 'fiea-backup-');
+                file_put_contents($path, "CREATE TABLE verificada(id INTEGER);\n");
+                return $path;
+            }
+        });
     }
 }

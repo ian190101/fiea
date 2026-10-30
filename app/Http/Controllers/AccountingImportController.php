@@ -1,200 +1,117 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
-use App\Models\AuditLog;
-use App\Models\Invoice;
-use App\Models\SystemSetting;
-use App\Services\AccountingImportParser;
+use App\Models\AccountingReview;
+use App\Models\BillingCase;
+use App\Models\FinancialImport;
+use App\Services\Finance\ControlImportService;
+use App\Services\Security\ScopeService;
+use App\Support\Decimal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
-class AccountingImportController extends Controller
+final class AccountingImportController extends Controller
 {
-    private const SESSION_KEY = 'accounting_import_preview';
-
-    public function preview(Request $request, AccountingImportParser $parser): RedirectResponse
+    public function preview(Request $request, ControlImportService $service): RedirectResponse
     {
         $data = $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
+            'file' => ['required', 'file', 'mimes:xlsx', 'max:5120'],
+            'sheet' => ['required', 'in:2025,2026'],
+            'locale' => ['nullable', 'in:en_US,es_EC'],
         ]);
+        config()->set('finance.control_import_locale', $data['locale'] ?? null);
+        $import = $service->preview($request->user(), $data['file'], $data['sheet']);
+        $request->session()->put('financial_import_id', $import->id);
 
-        try {
-            $rows = $parser->parse($data['file']);
-        } catch (\Throwable $exception) {
-            throw ValidationException::withMessages([
-                'file' => $exception->getMessage(),
-            ]);
-        }
-
-        if (count($rows) === 0) {
-            throw ValidationException::withMessages([
-                'file' => 'El archivo no contiene filas validas para importar.',
-            ]);
-        }
-
-        $preview = $this->buildPreview($rows);
-        $request->session()->put(self::SESSION_KEY, $preview);
-
-        return back()->with('success', 'Previsualizacion contable generada correctamente.');
+        return back()->with('success', 'Previsualización generada.');
     }
 
-    public function apply(Request $request): RedirectResponse
+    public function buildPreview(Request $request, int $importId): array
     {
-        $preview = $request->session()->get(self::SESSION_KEY);
-
-        if (! is_array($preview) || empty($preview['rows'])) {
-            throw ValidationException::withMessages([
-                'file' => 'Primero debes cargar y previsualizar un archivo contable.',
-            ]);
-        }
-
-        $settings = SystemSetting::query()->firstOrCreate(['id' => 1]);
-        $applicableRows = collect($preview['rows'])->where('can_apply', true);
-
-        if ($applicableRows->isEmpty()) {
-            throw ValidationException::withMessages([
-                'file' => 'No hay filas validas para aplicar.',
-            ]);
-        }
-
-        DB::transaction(function () use ($request, $settings, $applicableRows) {
-            foreach ($applicableRows as $row) {
-                $invoice = Invoice::query()->where('code', $row['code'])->lockForUpdate()->first();
-
-                if (! $invoice) {
-                    continue;
-                }
-
-                $before = $invoice->only([
-                    'accounting_status',
-                    'accounting_note',
-                    'total_dr',
-                    'total_wodr',
-                    'grand_total',
-                    'balance_conciliation',
-                ]);
-
-                $payload = [
-                    'accounting_status' => $row['accounting_status'],
-                    'accounting_note' => $row['accounting_note'] ?: null,
-                    'accounting_reviewed_by_id' => $request->user()?->id,
-                    'accounting_reviewed_at' => now(),
-                ];
-
-                if ($settings->accounting_can_edit_summary) {
-                    $payload['total_dr'] = round((float) $row['total_dr'], 2);
-                    $payload['total_wodr'] = round((float) $row['total_wodr'], 2);
-                    $payload['grand_total'] = round($payload['total_dr'] + $payload['total_wodr'], 2);
-                    $payload['balance_conciliation'] = round((float) $row['balance_conciliation'], 2);
-                }
-
-                $invoice->fill($payload)->save();
-
-                AuditLog::query()->create([
-                    'user_id' => $request->user()?->id,
-                    'action' => $settings->accounting_can_edit_summary ? 'accounting_import_applied_with_values' : 'accounting_import_reconciled',
-                    'module' => 'accounting',
-                    'auditable_type' => Invoice::class,
-                    'auditable_id' => $invoice->id,
-                    'ip_address' => $request->ip(),
-                    'user_agent' => substr((string) $request->userAgent(), 0, 500),
-                    'metadata' => [
-                        'source' => 'accounting_import',
-                        'before' => $before,
-                        'after' => $invoice->only([
-                            'accounting_status',
-                            'accounting_note',
-                            'total_dr',
-                            'total_wodr',
-                            'grand_total',
-                            'balance_conciliation',
-                        ]),
-                    ],
-                ]);
-            }
-        });
-
-        $request->session()->forget(self::SESSION_KEY);
-
-        return back()->with('success', $applicableRows->count().' filas contables aplicadas correctamente.');
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $rows
-     * @return array{summary: array<string, int>, rows: array<int, array<string, mixed>>}
-     */
-    private function buildPreview(array $rows): array
-    {
-        $settings = SystemSetting::query()->firstOrCreate(['id' => 1]);
-        $codes = collect($rows)->pluck('code')->filter()->unique()->values();
-        $invoices = Invoice::query()
-            ->whereIn('code', $codes)
-            ->get(['id', 'code', 'accounting_status', 'total_dr', 'total_wodr', 'grand_total', 'balance_conciliation'])
-            ->keyBy('code');
-
-        $previewRows = collect($rows)
-            ->map(function (array $row, int $index) use ($invoices, $settings) {
-                $invoice = $invoices->get($row['code']);
-                $errors = $this->rowErrors($row, $invoice !== null, $settings->accounting_can_edit_summary);
-
-                return [
-                    'row' => $index + 2,
-                    'code' => $row['code'],
-                    'invoice_id' => $invoice?->id,
-                    'current_status' => $invoice?->accounting_status,
-                    'current_total_dr' => $invoice?->total_dr,
-                    'current_total_wodr' => $invoice?->total_wodr,
-                    'current_balance_conciliation' => $invoice?->balance_conciliation,
-                    'accounting_status' => $row['accounting_status'],
-                    'total_dr' => $row['total_dr'],
-                    'total_wodr' => $row['total_wodr'],
-                    'balance_conciliation' => $row['balance_conciliation'],
-                    'accounting_note' => $row['accounting_note'],
-                    'can_apply' => count($errors) === 0,
-                    'errors' => $errors,
-                    'mode' => $settings->accounting_can_edit_summary ? 'update_values' : 'reconcile_only',
-                ];
-            })
-            ->values();
+        $data = $request->validate(['import_cursor' => ['nullable', 'string', 'max:500']]);
+        $import = FinancialImport::query()->where('actor_id', $request->user()->id)
+            ->findOrFail($importId);
+        $page = $import->rows()->whereNull('applied_at')->with(['cases.tripPhase', 'targetCase.tripPhase'])
+            ->orderBy('id')->cursorPaginate(25, ['*'], 'import_cursor', $data['import_cursor'] ?? null)->withQueryString();
+        $reviews = AccountingReview::query()->where('period_year', (int) $import->sheet)
+            ->whereIn('project_id', $page->getCollection()->flatMap(fn ($row) => $row->cases->pluck('tripPhase.project_id')
+                ->push($row->targetCase?->tripPhase?->project_id))->filter()->unique())
+            ->get()->keyBy(fn ($r) => $r->project_id.':'.$r->team_id);
+        $ids = $page->getCollection()->flatMap(fn ($row) => $row->cases->pluck('id')->push($row->target_case_id))
+            ->merge($reviews->flatMap(fn ($r) => $r->source['case_ids'] ?? []))->filter()->unique();
+        $visible = BillingCase::query()->whereIn('id', $ids)
+            ->whereIn('trip_phase_id', app(ScopeService::class)->tripPhases($request->user())->select('trip_phases.id'))
+            ->pluck('id')->flip();
+        $valid = $import->rows()->whereNull('applied_at')->whereJsonLength('errors', 0)->count();
 
         return [
-            'summary' => [
-                'total' => $previewRows->count(),
-                'valid' => $previewRows->where('can_apply', true)->count(),
-                'invalid' => $previewRows->where('can_apply', false)->count(),
-                'with_values' => $settings->accounting_can_edit_summary ? $previewRows->where('can_apply', true)->count() : 0,
-            ],
-            'rows' => $previewRows->all(),
+            'id' => $import->id, 'sheet' => $import->sheet, 'status' => $import->status,
+            'sha256' => $import->sha256, 'mapping_version' => $import->mapping_version,
+            'expires_at' => $import->expires_at?->toISOString(),
+            'summary' => ['valid' => $valid, 'invalid' => $import->rows()->whereNull('applied_at')->whereJsonLength('errors', '>', 0)->count(),
+                'applied' => $import->rows()->whereNotNull('applied_at')->count(), 'total' => $import->rows()->count()],
+            'next_page_url' => $page->nextPageUrl(), 'prev_page_url' => $page->previousPageUrl(),
+            'rows' => $page->getCollection()->map(function ($row) use ($request, $import, $visible, $reviews): array {
+                $members = $row->section === 'control_group' ? $row->cases : collect([$row->targetCase])->filter();
+                $permitted = $members->isNotEmpty() && $members->every(fn ($case) => $visible->has($case->id));
+                $phase = $members->first()?->tripPhase;
+                $review = $phase ? $reviews->get($phase->project_id.':'.$phase->team_id) : null;
+                if ($review && ! collect($review->source['case_ids'] ?? [])->every(fn ($id) => $visible->has($id))) {
+                    $permitted = false;
+                }
+                $values = $row->normalized;
+                $accountOnly = $import->sheet === '2025' && ($values['V'] ?? null) !== null
+                    && (($values['M'] ?? null) === null || Decimal::compare((string) $values['M'], '0') === 0);
+                $permission = $row->section === 'control_group' || $accountOnly ? 'accounting.manage' : 'payments.manage';
+
+                return [
+                    'id' => $row->id, 'section' => $row->section, 'source_row' => $row->source_row,
+                    'row' => $row->source_row, 'code' => implode(' & ', $values['codes'] ?? []), 'accounting_status' => 'pending',
+                    'total_dr' => $values['Q'] ?? $values['J'] ?? null, 'total_wodr' => $values['R'] ?? $values['K'] ?? null,
+                    'can_apply' => $row->errors === [] && $permitted && $import->expires_at?->isFuture() && $request->user()->hasPermission($permission),
+                    'group_project_id' => $phase?->project_id, 'review_version' => $review?->version,
+                    'resolutions' => $row->resolutions,
+                    'raw' => $row->raw, 'normalized' => $row->normalized, 'errors' => $row->errors,
+                    'target_case_id' => $row->target_case_id, 'expected_version' => $row->expected_version,
+                    'applied_at' => $row->applied_at?->toISOString(),
+                ];
+            })->values()->all(),
         ];
     }
 
-    /**
-     * @return array<int, string>
-     */
-    private function rowErrors(array $row, bool $invoiceExists, bool $canEditValues): array
+    public function apply(Request $request, ControlImportService $service): RedirectResponse
     {
-        $errors = [];
-
-        if (! $invoiceExists) {
-            $errors[] = 'No existe una invoice con este codigo.';
+        $data = $request->validate([
+            'import_id' => ['required', 'integer', 'exists:financial_imports,id'],
+            'row_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'row_ids.*' => ['required', 'integer', 'distinct'],
+            'resolutions' => ['nullable', 'array'],
+            'resolutions.*' => ['array:reference,method,stage,paid_on,fiea_reference,fiea_stage,fiea_method,fiea_paid_on,project_id,review_version,lifecycle_status,note'],
+            'resolutions.*.reference' => ['nullable', 'string', 'max:255'],
+            'resolutions.*.method' => ['nullable', 'in:CHECK,ACH,CREDIT_CARD,PAYPAL,TRANSFER,OTHER'],
+            'resolutions.*.stage' => ['nullable', 'in:initial,final'],
+            'resolutions.*.paid_on' => ['nullable', 'date_format:Y-m-d'],
+            'resolutions.*.fiea_reference' => ['nullable', 'string', 'max:255'],
+            'resolutions.*.fiea_stage' => ['nullable', 'in:initial,final'],
+            'resolutions.*.fiea_method' => ['nullable', 'in:CHECK,ACH,CREDIT_CARD,PAYPAL,TRANSFER,OTHER'],
+            'resolutions.*.fiea_paid_on' => ['nullable', 'date_format:Y-m-d'],
+            'resolutions.*.project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'resolutions.*.review_version' => ['nullable', 'integer', 'min:1'],
+            'resolutions.*.lifecycle_status' => ['nullable', 'in:ABIERTO,POR GASTAR,FINAL PEND,CERRADO,ANULADO'],
+            'resolutions.*.note' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $import = FinancialImport::query()->where('actor_id', $request->user()->id)->findOrFail($data['import_id']);
+        foreach ($data['resolutions'] ?? [] as $rowId => $resolution) {
+            abort_unless(in_array((int) $rowId, array_map('intval', $data['row_ids']), true), 422);
+            $row = $import->rows()->findOrFail((int) $rowId);
+            abort_if($row->applied_at !== null, 409);
+            $row->forceFill(['resolutions' => $resolution])->save();
         }
+        $service->apply($request->user(), (int) $data['import_id'], array_map('intval', $data['row_ids']));
 
-        if (! in_array($row['accounting_status'], ['pending', 'reconciled', 'flagged'], true)) {
-            $errors[] = 'Estado contable invalido.';
-        }
-
-        if ($canEditValues) {
-            foreach (['total_dr', 'total_wodr', 'balance_conciliation'] as $field) {
-                if ($row[$field] === null || $row[$field] < 0) {
-                    $errors[] = 'Los montos DR, WODR y balance deben ser numericos y no negativos.';
-                    break;
-                }
-            }
-        }
-
-        return $errors;
+        return back()->with('success', 'Filas aplicadas correctamente.');
     }
 }

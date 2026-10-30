@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="C:\Users\Ian\Desktop\FIEA_sist\phpunit.xml" tests="2" assertions="8" errors="0" failures="0" skipped="0" time="2.060146">
+    <testsuite name="Feature" tests="2" assertions="8" errors="0" failures="0" skipped="0" time="2.060146">
+      <testsuite name="Tests\Feature\SQLiteSnapshotWriterTest" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\SQLiteSnapshotWriterTest.php" tests="2" assertions="8" errors="0" failures="0" skipped="0" time="2.060146">
+        <testcase name="test_snapshot_restaura_bytes_tipos_secuencias_indices_vistas_y_triggers" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\SQLiteSnapshotWriterTest.php" line="15" class="Tests\Feature\SQLiteSnapshotWriterTest" classname="Tests.Feature.SQLiteSnapshotWriterTest" assertions="6" time="1.873816"/>
+        <testcase name="test_un_valor_no_representable_no_deja_un_snapshot_parcial" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\SQLiteSnapshotWriterTest.php" line="47" class="Tests\Feature\SQLiteSnapshotWriterTest" classname="Tests.Feature.SQLiteSnapshotWriterTest" assertions="2" time="0.186330"/>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

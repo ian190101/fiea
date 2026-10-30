@@ -1,10 +1,12 @@
 import IconButton from '@/Components/IconButton';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TableControls from '@/Components/TableControls';
+import EmptyState from '@/Components/EmptyState';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
+import CursorPager from '@/Components/CursorPager';
 import { Head, router, usePage } from '@inertiajs/react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 const statusStyles = {
     completed: 'bg-emerald-400/15 text-emerald-800 dark:text-emerald-100',
@@ -18,8 +20,10 @@ const statusLabels = {
     failed: 'Fallido',
 };
 
-export default function BackupIndex({ backups = [] }) {
+export default function BackupIndex({ backups: backupPage = [] }) {
+    const backups = Array.isArray(backupPage) ? backupPage : (backupPage?.data ?? []);
     const { flash } = usePage().props;
+    const [busy, setBusy] = useState(false);
     const searchableText = useCallback((backup) => [
         backup.type,
         backup.status,
@@ -37,8 +41,11 @@ export default function BackupIndex({ backups = [] }) {
     );
 
     const createBackup = () => {
+        if (busy) return;
+        setBusy(true);
         router.post(route('backups.store'), {}, {
             preserveScroll: true,
+            onFinish: () => setBusy(false),
         });
     };
 
@@ -70,8 +77,8 @@ export default function BackupIndex({ backups = [] }) {
                                 El backup se guarda en el almacenamiento activo del sistema. Si Cloudflare R2 esta configurado, se sube ahi; si no, queda en local.
                             </p>
                         </div>
-                        <PrimaryButton type="button" onClick={createBackup}>
-                            Generar backup
+                        <PrimaryButton type="button" onClick={createBackup} disabled={busy} aria-busy={busy}>
+                            {busy ? 'Generando…' : 'Generar backup'}
                         </PrimaryButton>
                     </div>
                 </section>
@@ -94,10 +101,12 @@ export default function BackupIndex({ backups = [] }) {
                             filtered={table.filteredRows.length}
                             placeholder="Buscar backup"
                         />
+                        <CursorPager page={backupPage} label="respaldos" />
                     </div>
 
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                            <caption className="sr-only">Historial de respaldos y descargas privadas</caption>
                             <thead>
                                 <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                     <th className="px-5 py-4">Archivo</th>
@@ -118,7 +127,7 @@ export default function BackupIndex({ backups = [] }) {
                                         </td>
                                         <td className="px-5 py-4">
                                             <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${statusStyles[backup.status] ?? statusStyles.failed}`}>
-                                                {statusLabels[backup.status] ?? backup.status}
+                                                {statusLabels[backup.status] ?? 'Estado desconocido'}
                                             </span>
                                         </td>
                                         <td className="px-5 py-4">{backup.disk ?? '-'}</td>
@@ -136,8 +145,8 @@ export default function BackupIndex({ backups = [] }) {
                                 ))}
                                 {table.filteredRows.length === 0 && (
                                     <tr>
-                                        <td colSpan="7" className="px-5 py-10 text-center text-sm font-semibold text-app-muted">
-                                            Aun no hay backups para este filtro.
+                                        <td colSpan="7" className="px-5 py-10">
+                                            <EmptyState title={backups.length ? 'Sin resultados para estos filtros' : 'Aún no hay respaldos'} description={backups.length ? 'Cambia la búsqueda.' : 'Genera un respaldo para comenzar.'} />
                                         </td>
                                     </tr>
                                 )}

@@ -1,46 +1,55 @@
 import { usePage } from '@inertiajs/react';
-import { useState } from 'react';
-import { applyTheme } from '@/Utils/theme';
+import { useEffect, useState } from 'react';
+import { applyTheme, resolveTheme } from '@/Utils/theme';
+import { readPreference, writePreference } from '@/Utils/preferences';
 
 export default function ThemeToggle({ className = '', compact = false }) {
     const user = usePage().props.auth.user;
-    const initialTheme = user?.theme_preference ?? localStorage.getItem('theme_preference') ?? 'light';
+    const initialTheme = user?.theme_preference ?? readPreference('theme_preference', 'light');
     const [currentTheme, setCurrentTheme] = useState(initialTheme);
-    const isDark = currentTheme === 'dark';
+    const [saving, setSaving] = useState(false);
+    useEffect(() => { setCurrentTheme(initialTheme); }, [initialTheme]);
+    const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const isDark = currentTheme === 'system' ? systemDark : resolveTheme(currentTheme) === 'dark';
+
+    useEffect(() => {
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const update = () => setSystemDark(media.matches);
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
 
     const updateTheme = () => {
         const nextTheme = isDark ? 'light' : 'dark';
 
         setCurrentTheme(nextTheme);
-        localStorage.setItem('theme_preference', nextTheme);
+        writePreference('theme_preference', nextTheme);
         applyTheme(nextTheme);
 
         if (!user) {
             return;
         }
 
-        fetch(route('theme-preference.update'), {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-            },
-            credentials: 'same-origin',
-            keepalive: true,
-            body: JSON.stringify({ theme_preference: nextTheme }),
+        setSaving(true);
+        // Axios toma XSRF-TOKEN de la cookie actual, incluso tras regenerar la sesión al entrar.
+        window.axios.patch(route('theme-preference.update'), { theme_preference: nextTheme }, { headers: { Accept: 'application/json' } }).then((response) => {
+            if (response.status !== 204) throw new Error('El servidor no confirmó el cambio de tema.');
         }).catch(() => {
             setCurrentTheme(currentTheme);
-            localStorage.setItem('theme_preference', currentTheme);
+            writePreference('theme_preference', currentTheme);
             applyTheme(currentTheme);
-        });
+        }).finally(() => setSaving(false));
     };
 
     return (
         <button
             type="button"
             onClick={updateTheme}
+            disabled={saving}
+            aria-busy={saving}
             aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            role="switch"
+            aria-checked={isDark}
             className={`${compact ? 'ios-switch-compact' : 'ios-switch'} ${isDark ? 'ios-switch-on' : ''} ${className}`}
         >
             {compact ? (

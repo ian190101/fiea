@@ -1,139 +1,88 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
-use App\Models\EstimatedExpense;
 use App\Models\StorageFile;
 use App\Models\TripPhase;
 use App\Models\User;
+use App\Services\Finance\FinancialSnapshotBuilder;
+use App\Services\Security\ScopeService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
-class DraftBudgetPdfService
+final class DraftBudgetPdfService
 {
     public function __construct(
         private readonly BrandingAssetService $brandingAssets,
         private readonly FileStorageService $files,
-    ) {
-    }
+        private readonly FinancialSnapshotBuilder $builder,
+    ) {}
 
     public function generate(TripPhase $tripPhase, ?User $user = null): StorageFile
     {
-        $tripPhase->loadMissing([
-            'project.country',
-            'project.community',
-            'team.chapter',
-            'assignedTechnician',
-            'estimatedExpenses.expenseCategory',
-        ]);
-
-        $expenses = $tripPhase->estimatedExpenses
-            ->sortBy([
-                ['fund_type', 'asc'],
-                ['description', 'asc'],
-            ])
-            ->values();
-
-        $summary = $this->summary($expenses);
+        if ($user !== null) {
+            app(ScopeService::class)
+                ->authorize($user, 'budgets.manage', (int) $tripPhase->id);
+        }
+        $cases = $tripPhase->billingCases()->orderBy('invoice_type')->get();
+        abort_unless($cases->isNotEmpty(), 422, 'El viaje no tiene matriz financiera.');
+        $sheets = [];
+        foreach ($cases as $case) {
+            foreach (['initial', 'final'] as $stage) {
+                if ($stage === 'initial' && $case->billing_mode === 'final_only') {
+                    continue;
+                }
+                $pointer = $stage === 'initial' ? 'currentInitial' : 'currentFinal';
+                $invoice = $case->{$pointer};
+                $snapshot = $invoice?->snapshot;
+                if (! is_array($snapshot) && ($case->lines()->count() === 0
+                    || $case->lines()->whereDoesntHave('versions', fn ($q) => $q->where('stage', $stage)->where('is_captured', true))->exists())) {
+                    continue;
+                }
+                if (! is_array($snapshot)) {
+                    $snapshot = $this->builder->build($case, $stage, null, true)['snapshot'];
+                }
+                $days = [];
+                $start = CarbonImmutable::parse($snapshot['metadata']['starts_on']);
+                $end = CarbonImmutable::parse($snapshot['metadata']['ends_on']);
+                for ($day = $start; $day->lte($end); $day = $day->addDay()) {
+                    $days[] = $day->toDateString();
+                }
+                foreach (array_chunk($days, 7) as $block) {
+                    $sheets[] = [
+                        'type' => $case->invoice_type, 'stage' => $stage, 'snapshot' => $snapshot, 'days' => $block,
+                    ];
+                }
+            }
+        }
+        abort_unless($sheets !== [], 422, 'La matriz aún no tiene una etapa completa.');
         $pdf = Pdf::loadView('pdf.draft-budget', [
-            'tripPhase' => $tripPhase,
-            'expenses' => $expenses,
-            'summary' => $summary,
-            'categorySummary' => $this->categorySummary($expenses),
-            'fundSummary' => $this->fundSummary($expenses),
-            'generatedAt' => now(),
+            'tripPhase' => $tripPhase, 'sheets' => $sheets,
             'brand' => $this->brandingAssets->colors(),
             'logoDataUri' => $this->brandingAssets->logoDataUri(),
-        ])->setPaper('letter', 'portrait');
-
+        ])->setOptions(['isRemoteEnabled' => false, 'isPhpEnabled' => false,
+            'chroot' => public_path('build')])->setPaper('letter', 'landscape');
         $contents = $pdf->output();
+        $digest = hash('sha256', json_encode($sheets, JSON_THROW_ON_ERROR));
+        $fileName = 'draft-budget-'.$tripPhase->id.'-'.substr($digest, 0, 16).'.pdf';
+        $key = 'draft-budgets/'.$tripPhase->id.'/'.$fileName;
         $disk = $this->files->activeDisk();
-        $fileName = $this->fileName($tripPhase);
-        $objectKey = 'draft-budgets/'.$tripPhase->id.'/'.$fileName;
+        if (! Storage::disk($disk)->exists($key)) {
+            Storage::disk($disk)->put($key, $contents);
+        }
+        $file = StorageFile::query()->firstOrCreate(['object_key' => $key], [
+            'provider' => $this->files->providerForDisk($disk),
+            'bucket' => $this->files->bucketForDisk($disk),
+            'original_name' => $fileName, 'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($contents), 'checksum' => hash('sha256', $contents),
+            'public_url' => null,
+            'uploaded_by_id' => $user?->id,
+        ]);
+        $tripPhase->forceFill(['draft_pdf_file_id' => $file->id])->save();
 
-        Storage::disk($disk)->put($objectKey, $contents);
-
-        $storageFile = StorageFile::query()->updateOrCreate(
-            ['object_key' => $objectKey],
-            [
-                'provider' => $this->files->providerForDisk($disk),
-                'bucket' => $this->files->bucketForDisk($disk),
-                'original_name' => $fileName,
-                'mime_type' => 'application/pdf',
-                'size_bytes' => strlen($contents),
-                'checksum' => hash('sha256', $contents),
-                'public_url' => $this->files->publicUrl($disk, $objectKey),
-                'uploaded_by_id' => $user?->id,
-            ]
-        );
-
-        $tripPhase->forceFill(['draft_pdf_file_id' => $storageFile->id])->save();
-
-        return $storageFile;
-    }
-
-    /**
-     * @param \Illuminate\Support\Collection<int, EstimatedExpense> $expenses
-     *
-     * @return array<string, float>
-     */
-    private function summary($expenses): array
-    {
-        $dr = (float) $expenses
-            ->where('fund_type', 'DR')
-            ->sum(fn (EstimatedExpense $expense) => (float) $expense->estimated_total);
-        $wodr = (float) $expenses
-            ->where('fund_type', 'WODR')
-            ->sum(fn (EstimatedExpense $expense) => (float) $expense->estimated_total);
-
-        return [
-            'dr' => round($dr, 2),
-            'wodr' => round($wodr, 2),
-            'grand_total' => round($dr + $wodr, 2),
-        ];
-    }
-
-    /**
-     * @param \Illuminate\Support\Collection<int, EstimatedExpense> $expenses
-     *
-     * @return array<int, array{name: string, total: float}>
-     */
-    private function categorySummary($expenses): array
-    {
-        return $expenses
-            ->groupBy(fn (EstimatedExpense $expense) => $expense->expenseCategory?->name ?? 'Uncategorized')
-            ->map(fn ($items, string $name) => [
-                'name' => $name,
-                'total' => round((float) $items->sum(fn (EstimatedExpense $expense) => (float) $expense->estimated_total), 2),
-            ])
-            ->sortByDesc('total')
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @param \Illuminate\Support\Collection<int, EstimatedExpense> $expenses
-     *
-     * @return array<int, array{name: string, total: float}>
-     */
-    private function fundSummary($expenses): array
-    {
-        return collect(['DR', 'WODR'])
-            ->map(fn (string $fund) => [
-                'name' => $fund,
-                'total' => round((float) $expenses
-                    ->where('fund_type', $fund)
-                    ->sum(fn (EstimatedExpense $expense) => (float) $expense->estimated_total), 2),
-            ])
-            ->all();
-    }
-
-    private function fileName(TripPhase $tripPhase): string
-    {
-        $projectCode = Str::slug($tripPhase->project?->code ?? 'project');
-        $phase = Str::slug($tripPhase->phase);
-
-        return "{$projectCode}-{$phase}-draft-budget.pdf";
+        return $file;
     }
 }

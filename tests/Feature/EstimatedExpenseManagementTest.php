@@ -13,11 +13,13 @@ use App\Models\Team;
 use App\Models\TripPhase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class EstimatedExpenseManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_draft_budget(): void
     {
@@ -27,16 +29,20 @@ class EstimatedExpenseManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_draft_budget(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['budgets.view', 'budgets.manage']);
 
         $this->actingAs($user)
             ->get('/draft-budget')
-            ->assertOk();
+            ->assertOk()
+            ->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+                ->has('estimatedExpenses.data')
+                ->has('tripPhases')
+                ->has('expenseCategories'));
     }
 
     public function test_authenticated_users_can_create_estimated_expenses(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['budgets.view', 'budgets.manage']);
         $tripPhase = $this->createTripPhase();
         $category = ExpenseCategory::query()->create([
             'name' => 'Lodging',
@@ -50,11 +56,12 @@ class EstimatedExpenseManagementTest extends TestCase
         $this->actingAs($user)
             ->post(route('estimated-expenses.store'), [
                 'trip_phase_id' => $tripPhase->id,
+                'version' => $tripPhase->fresh()->version,
                 'expense_category_id' => $category->id,
                 'description' => 'Hotel rooms',
                 'unit' => 'night',
-                'initial_unit_cost' => 125.50,
-                'initial_quantity' => 4,
+                'initial_unit_cost' => '125.50',
+                'initial_quantity' => '4',
                 'estimated_total' => 1,
                 'fund_type' => 'WODR',
             ])
@@ -72,7 +79,7 @@ class EstimatedExpenseManagementTest extends TestCase
 
     public function test_estimated_expense_uses_category_fund_type(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['budgets.view', 'budgets.manage']);
         $tripPhase = $this->createTripPhase();
         $category = ExpenseCategory::query()->create([
             'name' => 'Bank Fees',
@@ -86,11 +93,12 @@ class EstimatedExpenseManagementTest extends TestCase
         $this->actingAs($user)
             ->post(route('estimated-expenses.store'), [
                 'trip_phase_id' => $tripPhase->id,
+                'version' => $tripPhase->fresh()->version,
                 'expense_category_id' => $category->id,
                 'description' => 'Wire transfer fee',
                 'unit' => 'fee',
-                'initial_unit_cost' => 30,
-                'initial_quantity' => 2,
+                'initial_unit_cost' => '30',
+                'initial_quantity' => '2',
             ])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
@@ -104,43 +112,45 @@ class EstimatedExpenseManagementTest extends TestCase
 
     public function test_estimated_expense_rejects_negative_unit_cost(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['budgets.view', 'budgets.manage']);
         $tripPhase = $this->createTripPhase();
         $category = $this->createCategory();
 
         $this->actingAs($user)
             ->post(route('estimated-expenses.store'), [
                 'trip_phase_id' => $tripPhase->id,
+                'version' => $tripPhase->fresh()->version,
                 'expense_category_id' => $category->id,
                 'description' => 'Invalid cost',
                 'unit' => 'unit',
-                'initial_unit_cost' => -1,
-                'initial_quantity' => 1,
+                'initial_unit_cost' => '-1',
+                'initial_quantity' => '1',
             ])
             ->assertSessionHasErrors('initial_unit_cost');
     }
 
     public function test_estimated_expense_rejects_negative_quantity(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['budgets.view', 'budgets.manage']);
         $tripPhase = $this->createTripPhase();
         $category = $this->createCategory();
 
         $this->actingAs($user)
             ->post(route('estimated-expenses.store'), [
                 'trip_phase_id' => $tripPhase->id,
+                'version' => $tripPhase->fresh()->version,
                 'expense_category_id' => $category->id,
                 'description' => 'Invalid quantity',
                 'unit' => 'unit',
-                'initial_unit_cost' => 1,
-                'initial_quantity' => -1,
+                'initial_unit_cost' => '1',
+                'initial_quantity' => '-1',
             ])
             ->assertSessionHasErrors('initial_quantity');
     }
 
     public function test_authenticated_users_can_update_estimated_expenses(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['budgets.view', 'budgets.manage']);
         $tripPhase = $this->createTripPhase();
         $category = $this->createCategory();
         $expense = EstimatedExpense::query()->create([
@@ -148,8 +158,8 @@ class EstimatedExpenseManagementTest extends TestCase
             'expense_category_id' => $category->id,
             'description' => 'Original',
             'unit' => 'unit',
-            'initial_unit_cost' => 10,
-            'initial_quantity' => 2,
+            'initial_unit_cost' => '10',
+            'initial_quantity' => '2',
             'estimated_total' => 20,
             'fund_type' => 'DR',
         ]);
@@ -157,11 +167,12 @@ class EstimatedExpenseManagementTest extends TestCase
         $this->actingAs($user)
             ->patch(route('estimated-expenses.update', $expense->id), [
                 'trip_phase_id' => $tripPhase->id,
+                'version' => $tripPhase->fresh()->version,
                 'expense_category_id' => $category->id,
                 'description' => 'Updated',
                 'unit' => 'person',
-                'initial_unit_cost' => 15,
-                'initial_quantity' => 3,
+                'initial_unit_cost' => '15',
+                'initial_quantity' => '3',
             ])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
@@ -176,7 +187,7 @@ class EstimatedExpenseManagementTest extends TestCase
 
     public function test_authenticated_users_can_delete_estimated_expenses(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['budgets.view', 'budgets.manage']);
         $tripPhase = $this->createTripPhase();
         $category = $this->createCategory();
         $expense = EstimatedExpense::query()->create([
@@ -184,14 +195,14 @@ class EstimatedExpenseManagementTest extends TestCase
             'expense_category_id' => $category->id,
             'description' => 'Temporary',
             'unit' => 'unit',
-            'initial_unit_cost' => 10,
-            'initial_quantity' => 1,
+            'initial_unit_cost' => '10',
+            'initial_quantity' => '1',
             'estimated_total' => 10,
             'fund_type' => 'DR',
         ]);
 
         $this->actingAs($user)
-            ->delete(route('estimated-expenses.destroy', $expense->id))
+            ->delete(route('estimated-expenses.destroy', $expense->id), ['version' => $tripPhase->fresh()->version])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 

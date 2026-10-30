@@ -6,6 +6,9 @@ use App\Models\Chapter;
 use App\Models\ContactAssignment;
 use App\Models\ContactPerson;
 use App\Models\Team;
+use App\Http\Requests\SaveContactRequest;
+use App\Actions\Contacts\SaveContact;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,12 +20,17 @@ class ContactController extends Controller
 {
     public function index(): Response
     {
+        $actor = request()->user();
+        $chapterIds = DB::table('user_chapter_assignments')->select('chapter_id')->where('user_id', $actor->id);
         return Inertia::render('Contacts/Index', [
             'contacts' => Inertia::defer(fn () => ContactPerson::query()
+                ->when(!$actor->scope_all, fn ($q) => $q->whereHas('assignments', fn ($a) => $a->whereIn('chapter_id', $chapterIds)))
                 ->withCount(['assignments', 'assignments as active_assignments_count' => fn ($query) => $query->where('is_active', true)])
                 ->orderBy('full_name')
-                ->get(['id', 'full_name', 'email', 'phone', 'physical_address']), 'contacts'),
+                ->orderBy('id')->cursorPaginate(25,
+                    ['id', 'full_name', 'email', 'phone', 'physical_address'], 'contacts_cursor'), 'contacts'),
             'assignments' => Inertia::defer(fn () => ContactAssignment::query()
+                ->when(!$actor->scope_all, fn ($q) => $q->whereIn('chapter_id', $chapterIds))
                 ->with([
                     'contactPerson:id,full_name,email',
                     'chapter:id,name',
@@ -30,14 +38,18 @@ class ContactController extends Controller
                 ])
                 ->orderByDesc('is_active')
                 ->orderBy('role')
-                ->get(['id', 'contact_person_id', 'chapter_id', 'team_id', 'role', 'is_billing_contact', 'is_email_recipient', 'is_active']), 'contacts'),
+                ->orderBy('id')->cursorPaginate(25,
+                    ['id', 'contact_person_id', 'chapter_id', 'team_id', 'role',
+                        'is_billing_contact', 'is_email_recipient', 'is_active'], 'assignments_cursor'), 'contacts'),
             'chapters' => Inertia::defer(fn () => Chapter::query()
+                ->when(!$actor->scope_all, fn ($q) => $q->whereIn('chapters.id', $chapterIds))
                 ->orderBy('name')
-                ->get(['id', 'name']), 'contacts'),
+                ->limit(25)->get(['id', 'name']), 'contacts'),
             'teams' => Inertia::defer(fn () => Team::query()
+                ->when(!$actor->scope_all, fn ($q) => $q->whereIn('teams.chapter_id', $chapterIds))
                 ->with('chapter:id,name')
                 ->orderBy('name')
-                ->get(['id', 'chapter_id', 'name']), 'contacts'),
+                ->limit(25)->get(['id', 'chapter_id', 'name']), 'contacts'),
             'roleOptions' => [
                 'Primary Contact',
                 'Billing Contact',
@@ -49,22 +61,24 @@ class ContactController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(SaveContactRequest $request, SaveContact $action): RedirectResponse
     {
-        ContactPerson::query()->create($this->validatedData($request));
+        $action->execute($request->user(),null,$request->validated());
 
         return back()->with('success', 'Contacto creado correctamente.');
     }
 
-    public function update(Request $request, ContactPerson $contact): RedirectResponse
+    public function update(SaveContactRequest $request, ContactPerson $contact,
+        SaveContact $action): RedirectResponse
     {
-        $contact->fill($this->validatedData($request, $contact->id))->save();
+        $action->execute($request->user(),$contact,$request->validated());
 
         return back()->with('success', 'Contacto actualizado correctamente.');
     }
 
     public function destroy(ContactPerson $contact): RedirectResponse
     {
+        $this->authorizeContact(request(), $contact);
         try {
             $contact->delete();
         } catch (QueryException) {
@@ -76,16 +90,13 @@ class ContactController extends Controller
         return back()->with('success', 'Contacto eliminado correctamente.');
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function validatedData(Request $request, ?int $id = null): array
+    private function authorizeContact(Request $request, ContactPerson $contact): void
     {
-        return $request->validate([
-            'full_name' => ['required', 'string', 'max:160'],
-            'email' => ['nullable', 'email:rfc', 'max:160', Rule::unique('contact_people', 'email')->ignore($id)],
-            'phone' => ['nullable', 'string', 'max:60'],
-            'physical_address' => ['nullable', 'string', 'max:255'],
-        ]);
+        if ($request->user()->scope_all) return;
+        $assignments = ContactAssignment::query()->where('contact_person_id', $contact->id);
+        abort_unless((clone $assignments)->exists(), 404);
+        $chapterIds = DB::table('user_chapter_assignments')->select('chapter_id')->where('user_id', $request->user()->id);
+        abort_if($assignments->whereNotIn('chapter_id', $chapterIds)->exists(), 404);
     }
+
 }

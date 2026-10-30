@@ -26,8 +26,13 @@ class SystemNotificationController extends Controller
                 ->when(($filters['status'] ?? null) === 'unread', fn ($query) => $query->whereNull('read_at'))
                 ->when(($filters['status'] ?? null) === 'read', fn ($query) => $query->whereNotNull('read_at'))
                 ->orderByDesc('created_at')
+                ->orderByDesc('id')
                 ->cursorPaginate(20)
-                ->withQueryString(), 'notifications'),
+                ->withQueryString()->toArray() + [
+                    'unread' => SystemNotification::query()->where('user_id', $request->user()->id)->whereNull('read_at')->count(),
+                    'recent' => SystemNotification::query()->where('user_id', $request->user()->id)->whereNull('read_at')
+                        ->orderByDesc('created_at')->orderByDesc('id')->limit(3)->get(['id', 'title', 'severity', 'created_at'])->toArray(),
+                ], 'notifications'),
         ]);
     }
 

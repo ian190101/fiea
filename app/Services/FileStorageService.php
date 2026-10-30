@@ -8,7 +8,14 @@ class FileStorageService
 {
     public function activeDisk(): string
     {
-        return $this->r2IsReady() ? 'r2' : 'local';
+        $configured = (string) config('filesystems.default');
+        if ($configured === 'r2' && !$this->r2IsReady()) {
+            throw new \RuntimeException('El almacenamiento privado R2 no está configurado completamente.');
+        }
+        if (!in_array($configured, ['r2', 'local'], true)) {
+            throw new \RuntimeException('El disco privado configurado no está permitido.');
+        }
+        return $configured;
     }
 
     public function providerForDisk(string $disk): string

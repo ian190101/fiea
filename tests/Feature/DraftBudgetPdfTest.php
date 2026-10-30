@@ -3,9 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Chapter;
+use App\Models\BillingCase;
+use App\Models\BudgetLine;
+use App\Models\BudgetLineVersion;
 use App\Models\ChapterType;
 use App\Models\Community;
 use App\Models\Country;
+use App\Models\ContactPerson;
+use App\Models\ContactAssignment;
 use App\Models\EstimatedExpense;
 use App\Models\ExpenseCategory;
 use App\Models\Project;
@@ -13,6 +18,8 @@ use App\Models\StorageFile;
 use App\Models\Team;
 use App\Models\TripPhase;
 use App\Models\User;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -25,7 +32,7 @@ class DraftBudgetPdfTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $tripPhase = $this->createTripPhaseWithEstimatedExpenses();
 
         $this->actingAs($user)
@@ -48,7 +55,7 @@ class DraftBudgetPdfTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $tripPhase = $this->createTripPhaseWithEstimatedExpenses();
 
         $this->actingAs($user)->post(route('draft-budget-pdf.store', $tripPhase->id));
@@ -65,7 +72,7 @@ class DraftBudgetPdfTest extends TestCase
     {
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $tripPhase = $this->createTripPhaseWithEstimatedExpenses();
 
         $this->actingAs($user)->post(route('draft-budget-pdf.store', $tripPhase->id));
@@ -78,12 +85,27 @@ class DraftBudgetPdfTest extends TestCase
 
     public function test_download_returns_not_found_when_pdf_has_not_been_generated(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $tripPhase = $this->createTripPhaseWithEstimatedExpenses();
 
         $this->actingAs($user)
             ->get(route('draft-budget-pdf.show', $tripPhase->id))
             ->assertNotFound();
+    }
+
+    private function authorizedUser(): User
+    {
+        $user = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $user->forceFill(['scope_all' => true])->save();
+        $role = Role::query()->firstOrCreate(['code' => 'budgets_test'], ['name' => 'Presupuestos prueba']);
+        foreach (['budgets.view', 'budgets.manage'] as $code) {
+            $permission = Permission::query()->firstOrCreate(['code' => $code], [
+                'module' => 'budgets', 'name' => $code,
+            ]);
+            $role->permissions()->syncWithoutDetaching([$permission->id]);
+        }
+        $user->roles()->attach($role);
+        return $user;
     }
 
     private function createTripPhaseWithEstimatedExpenses(): TripPhase
@@ -121,6 +143,15 @@ class DraftBudgetPdfTest extends TestCase
             'name' => 'Missouri Team',
             'description' => null,
             'credit_balance' => 0,
+        ]);
+        $contact = ContactPerson::query()->create([
+            'full_name' => 'Contacto de prueba', 'email' => 'contacto@example.test',
+            'phone' => '5551234', 'physical_address' => 'Calle de prueba 1',
+        ]);
+        ContactAssignment::query()->create([
+            'contact_person_id' => $contact->id, 'chapter_id' => $chapter->id,
+            'team_id' => $team->id, 'role' => 'Billing Contact',
+            'is_billing_contact' => true, 'is_email_recipient' => true, 'is_active' => true,
         ]);
         $tripPhase = TripPhase::query()->create([
             'project_id' => $project->id,
@@ -172,6 +203,20 @@ class DraftBudgetPdfTest extends TestCase
             'estimated_total' => 30,
             'fund_type' => 'WODR',
         ]);
+
+        $case = BillingCase::query()->create([
+            'trip_phase_id' => $tripPhase->id, 'invoice_type' => 'IC',
+            'billing_mode' => 'final_only', 'metadata' => ['document_date' => '2026-07-10'],
+        ]);
+        $line = BudgetLine::query()->create([
+            'billing_case_id' => $case->id, 'catalog_key' => 'ic.airport_pickup',
+            'description_en' => 'Airport Pickup', 'unit' => 'day', 'section' => 'Transportation',
+            'bucket' => 'dr', 'arranged_eligible' => true, 'sort_order' => 1,
+        ]);
+        $version = BudgetLineVersion::query()->create([
+            'budget_line_id' => $line->id, 'stage' => 'final', 'unit_cost' => '60.0000',
+        ]);
+        $version->cells()->create(['spent_on' => '2026-07-01', 'quantity' => '1.0000']);
 
         return $tripPhase;
     }

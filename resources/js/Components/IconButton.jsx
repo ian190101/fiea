@@ -49,9 +49,10 @@ const IconButton = forwardRef(function IconButton({
     return (
         <Component
             ref={ref}
+            type={Component === 'button' ? 'button' : undefined}
             aria-label={label}
             title={label}
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/45 bg-white/35 shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-transparent dark:border-white/10 dark:bg-white/10 ${variants[variant] ?? variants.default} ${className}`}
+            className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/45 bg-white/35 shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary dark:border-white/10 dark:bg-white/10 ${variants[variant] ?? variants.default} ${className}`}
             {...props}
         >
             <SvgIcon name={icon} />

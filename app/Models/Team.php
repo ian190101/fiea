@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Team extends Model
 {
-    protected $fillable = ['chapter_id', 'name', 'description', 'credit_balance'];
+    protected $fillable = ['chapter_id', 'name', 'description'];
 
     protected function casts(): array
     {
@@ -26,5 +26,10 @@ class Team extends Model
     public function tripPhases()
     {
         return $this->hasMany(TripPhase::class);
+    }
+
+    public function creditAccount()
+    {
+        return $this->hasOne(CreditAccount::class)->where('currency', 'USD');
     }
 }

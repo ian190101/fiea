@@ -1,0 +1,59 @@
+{
+  "casos": 3,
+  "conformes": 3,
+  "fallos_contrato": 0,
+  "errores_ejecucion": 0,
+  "resultados": [
+    {
+      "nombre": "previsualización envía archivo, hoja y perfil explícitos",
+      "observado": {
+        "url": "/accounting-import.preview",
+        "data": {
+          "file": {
+            "name": "control.xlsx"
+          },
+          "sheet": "2025",
+          "locale": "es_EC"
+        }
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "aplicación usa únicamente las filas elegidas y sus resoluciones",
+      "observado": {
+        "url": "/accounting-import.apply",
+        "data": {
+          "import_id": 1,
+          "row_ids": [
+            1
+          ],
+          "resolutions": {
+            "1": {
+              "project_id": 1,
+              "review_version": null,
+              "reference": "BANCO-PRUEBA",
+              "method": "ACH",
+              "stage": "initial",
+              "paid_on": "2026-10-20",
+              "fiea_reference": "",
+              "fiea_method": "",
+              "fiea_stage": "",
+              "fiea_paid_on": "",
+              "note": ""
+            }
+          }
+        }
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "cambiar página exige confirmar el descarte de resoluciones pendientes",
+      "observado": {
+        "destino": "/contabilidad?import_cursor=segunda",
+        "aplicaciones": 0
+      },
+      "estado": "conforme"
+    }
+  ],
+  "limite": "React, formularios y confirmaciones reales en Chrome temporal; se simulan Inertia y el transporte. El backend se comprueba por HTTP y servicios en SQLite aislado."
+}

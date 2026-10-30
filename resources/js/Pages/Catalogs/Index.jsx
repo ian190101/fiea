@@ -1,9 +1,12 @@
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TableControls from '@/Components/TableControls';
 import TextInput from '@/Components/TextInput';
+import EmptyState from '@/Components/EmptyState';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
@@ -85,10 +88,12 @@ const catalogDefinitions = [
     },
 ];
 
-export default function CatalogIndex({ catalogs = {} }) {
+export default function CatalogIndex({ catalogs = {}, canManage = false }) {
     const { flash } = usePage().props;
     const [activeKey, setActiveKey] = useState(catalogDefinitions[0].key);
     const [editingItem, setEditingItem] = useState(null);
+    const [itemToDelete, setItemToDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const activeCatalog = catalogDefinitions.find((catalog) => catalog.key === activeKey);
     const rows = catalogs[activeCatalog.prop] ?? [];
     const formDefaults = useMemo(() => buildDefaults(activeCatalog, catalogs), [activeCatalog, catalogs]);
@@ -139,10 +144,7 @@ export default function CatalogIndex({ catalogs = {} }) {
     };
 
     const destroy = (item) => {
-        if (!window.confirm(`Eliminar "${item.name}"?`)) {
-            return;
-        }
-
+        setDeleting(true);
         router.delete(route('catalogs.destroy', [activeCatalog.key, item.id]), {
             preserveScroll: true,
             onSuccess: () => {
@@ -150,6 +152,7 @@ export default function CatalogIndex({ catalogs = {} }) {
                     cancelEdit();
                 }
             },
+            onFinish: () => { setDeleting(false); setItemToDelete(null); },
         });
     };
 
@@ -167,6 +170,10 @@ export default function CatalogIndex({ catalogs = {} }) {
             }
         >
             <Head title="Catalogos" />
+            <FinancialActionSheet open={Boolean(itemToDelete)} title="Eliminar registro"
+                description={itemToDelete ? `Se eliminará ${itemToDelete.name}. Esta acción no se puede deshacer.` : ''}
+                confirmLabel="Eliminar registro" busy={deleting} onCancel={() => setItemToDelete(null)}
+                onConfirm={() => itemToDelete && destroy(itemToDelete)} />
 
             <div className="grid max-w-7xl gap-6 xl:grid-cols-[290px_1fr]">
                 <aside className="glass-panel rounded-[2rem] p-3">
@@ -190,7 +197,7 @@ export default function CatalogIndex({ catalogs = {} }) {
                 </aside>
 
                 <section className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr]">
-                    <form onSubmit={submit} className="glass-panel rounded-[2rem] p-5">
+                    {canManage && <form onSubmit={submit} className="glass-panel rounded-[2rem] p-5">
                         <div>
                             <h2 className="text-xl font-black text-app-text">
                                 {editingItem ? 'Editar registro' : 'Nuevo registro'}
@@ -235,7 +242,7 @@ export default function CatalogIndex({ catalogs = {} }) {
                                 </button>
                             )}
                         </div>
-                    </form>
+                    </form>}
 
                     <div className="glass-panel overflow-hidden rounded-[2rem]">
                         <div className="space-y-4 border-b border-white/30 px-5 py-5 dark:border-white/10">
@@ -259,6 +266,7 @@ export default function CatalogIndex({ catalogs = {} }) {
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                <caption className="sr-only">Registros del catálogo {activeCatalog.title}</caption>
                                 <thead>
                                     <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                         {activeCatalog.columns.map((column) => (
@@ -276,17 +284,17 @@ export default function CatalogIndex({ catalogs = {} }) {
                                                 </td>
                                             ))}
                                             <td className="px-5 py-4">
-                                                <div className="flex justify-end gap-2">
+                                                {canManage && <div className="flex justify-end gap-2">
                                                     <IconButton icon="edit" label="Editar registro" type="button" onClick={() => edit(row)} />
-                                                    <IconButton icon="trash" label="Eliminar registro" type="button" variant="danger" onClick={() => destroy(row)} />
-                                                </div>
+                                                    <IconButton icon="trash" label="Eliminar registro" type="button" variant="danger" onClick={() => setItemToDelete(row)} />
+                                                </div>}
                                             </td>
                                         </tr>
                                     ))}
                                     {table.filteredRows.length === 0 && (
                                         <tr>
-                                            <td className="px-5 py-10 text-center text-sm font-semibold text-app-muted" colSpan={activeCatalog.columns.length + 1}>
-                                                Aun no hay registros en este catalogo.
+                                            <td className="px-5 py-10" colSpan={activeCatalog.columns.length + 1}>
+                                                <EmptyState title={rows.length ? 'Sin resultados para estos filtros' : 'Aún no hay registros'} description={rows.length ? 'Prueba otra búsqueda.' : 'Crea el primer registro de este catálogo.'} />
                                             </td>
                                         </tr>
                                     )}
@@ -309,9 +317,11 @@ function Field({ field, value, catalogs, error, onChange }) {
                     id={field.name}
                     value={value ?? ''}
                     onChange={(event) => onChange(event.target.value)}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? `${field.name}-error` : undefined}
                     className="mt-1 block min-h-24 w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm placeholder:text-app-muted/70 focus:border-brand-primary focus:ring-brand-primary dark:bg-white/10"
                 />
-                <InputError message={error} className="mt-2" />
+                <InputError id={`${field.name}-error`} message={error} className="mt-2" />
             </div>
         );
     }
@@ -322,10 +332,12 @@ function Field({ field, value, catalogs, error, onChange }) {
         return (
             <div>
                 <InputLabel htmlFor={field.name} value={field.label} />
-                <select
+                <LiquidSelect
                     id={field.name}
                     value={value ?? ''}
                     onChange={(event) => onChange(event.target.value)}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? `${field.name}-error` : undefined}
                     className="mt-1 block w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
                 >
                     <option value="">Seleccionar</option>
@@ -334,8 +346,8 @@ function Field({ field, value, catalogs, error, onChange }) {
                             {option.name}
                         </option>
                     ))}
-                </select>
-                <InputError message={error} className="mt-2" />
+                </LiquidSelect>
+                <InputError id={`${field.name}-error`} message={error} className="mt-2" />
             </div>
         );
     }
@@ -362,9 +374,11 @@ function Field({ field, value, catalogs, error, onChange }) {
                 type={field.type}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${field.name}-error` : undefined}
                 className="mt-1 block w-full"
             />
-            <InputError message={error} className="mt-2" />
+            <InputError id={`${field.name}-error`} message={error} className="mt-2" />
         </div>
     );
 }

@@ -20,7 +20,7 @@ class ExpenseCategory extends Model
         return [
             'applies_service_fee' => 'boolean',
             'applies_contingency' => 'boolean',
-            'service_fee_percentage' => 'decimal:2',
+            'service_fee_percentage' => 'decimal:4',
         ];
     }
 

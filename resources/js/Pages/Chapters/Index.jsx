@@ -1,3 +1,8 @@
+import { useOptionCollection } from '@/Utils/useOptionCollection';
+import CursorPager from '@/Components/CursorPager';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
@@ -6,13 +11,19 @@ import TableControls from '@/Components/TableControls';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export default function ChapterIndex({ chapters = [], teams = [], chapterTypes = [], universities = [] }) {
+export default function ChapterIndex({ chapters: chapterPage = [], teams: teamPage = [], chapterTypes: initialchapterTypes = [], universities: initialuniversities = [], creditTotals = {} }) {
+    const chapterTypes = useOptionCollection(initialchapterTypes, 'chapter-types');
+    const universities = useOptionCollection(initialuniversities, 'universities');
+    const chapters = Array.isArray(chapterPage) ? chapterPage : chapterPage.data ?? [];
+    const teams = Array.isArray(teamPage) ? teamPage : teamPage.data ?? [];
     const { flash } = usePage().props;
     const [editingChapter, setEditingChapter] = useState(null);
     const [editingTeam, setEditingTeam] = useState(null);
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
     const [selectedChapterId, setSelectedChapterId] = useState(chapters[0]?.id ?? '');
 
     const selectedChapter = useMemo(
@@ -49,7 +60,6 @@ export default function ChapterIndex({ chapters = [], teams = [], chapterTypes =
         chapter_id: selectedChapterId,
         name: '',
         description: '',
-        credit_balance: 0,
     });
 
     useEffect(() => {
@@ -120,7 +130,6 @@ export default function ChapterIndex({ chapters = [], teams = [], chapterTypes =
             chapter_id: team.chapter_id,
             name: team.name ?? '',
             description: team.description ?? '',
-            credit_balance: team.credit_balance ?? 0,
         });
     };
 
@@ -142,37 +151,27 @@ export default function ChapterIndex({ chapters = [], teams = [], chapterTypes =
             chapter_id: selectedChapterId,
             name: '',
             description: '',
-            credit_balance: 0,
         });
     };
 
     const deleteChapter = (chapter) => {
-        if (!window.confirm(`Eliminar "${chapter.name}"?`)) {
-            return;
-        }
-
-        router.delete(route('chapters.destroy', chapter.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                if (editingChapter?.id === chapter.id) {
-                    resetChapterForm();
-                }
-            },
-        });
+        setPendingDelete({ type: 'chapter', item: chapter });
     };
 
     const deleteTeam = (team) => {
-        if (!window.confirm(`Eliminar "${team.name}"?`)) {
-            return;
-        }
+        setPendingDelete({ type: 'team', item: team });
+    };
 
-        router.delete(route('teams.destroy', team.id), {
+    const confirmDelete = () => {
+        if (!pendingDelete || deleteBusy) return;
+        setDeleteBusy(true);
+        router.delete(route(pendingDelete.type === 'chapter' ? 'chapters.destroy' : 'teams.destroy', pendingDelete.item.id), {
             preserveScroll: true,
             onSuccess: () => {
-                if (editingTeam?.id === team.id) {
-                    resetTeamForm();
-                }
+                if (pendingDelete.type === 'chapter' && editingChapter?.id === pendingDelete.item.id) resetChapterForm();
+                if (pendingDelete.type === 'team' && editingTeam?.id === pendingDelete.item.id) resetTeamForm();
             },
+            onFinish: () => { setDeleteBusy(false); setPendingDelete(null); },
         });
     };
 
@@ -193,6 +192,9 @@ export default function ChapterIndex({ chapters = [], teams = [], chapterTypes =
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
+                <CursorPager page={chapterPage} label="capítulos" />
+                <CursorPager page={teamPage} label="equipos" />
+
 
                 <section className="grid gap-6 xl:grid-cols-[360px_1fr]">
                     <form onSubmit={submitChapter} className="glass-panel rounded-[2rem] p-5">
@@ -345,16 +347,6 @@ export default function ChapterIndex({ chapters = [], teams = [], chapterTypes =
                                 onChange={(value) => teamForm.setData('name', value)}
                             />
 
-                            <TextField
-                                id="credit_balance"
-                                label="Credito actual"
-                                type="number"
-                                step="0.01"
-                                value={teamForm.data.credit_balance}
-                                error={teamForm.errors.credit_balance}
-                                onChange={(value) => teamForm.setData('credit_balance', value)}
-                            />
-
                             <TextareaField
                                 id="team_description"
                                 label="Descripcion"
@@ -386,7 +378,7 @@ export default function ChapterIndex({ chapters = [], teams = [], chapterTypes =
                                     </p>
                                 </div>
                                 <div className="rounded-2xl bg-white/30 px-4 py-2 text-sm font-black text-app-text dark:bg-white/10">
-                                    Credito total: {formatMoney(sumCredits(filteredTeams))}
+                                    Crédito total confirmado: {formatMoney(creditTotals[String(selectedChapterId)] ?? null)}
                                 </div>
                             </div>
                             <TableControls
@@ -440,6 +432,9 @@ export default function ChapterIndex({ chapters = [], teams = [], chapterTypes =
                     </div>
                 </section>
             </div>
+            <FinancialActionSheet open={Boolean(pendingDelete)} busy={deleteBusy} title="Eliminar registro"
+                description={pendingDelete ? `Se eliminará «${pendingDelete.item.name}».` : ''}
+                confirmLabel="Eliminar" onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
         </AuthenticatedLayout>
     );
 }
@@ -474,7 +469,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -486,7 +481,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
                         {option.name}
                     </option>
                 ))}
-            </select>
+            </LiquidSelect>
             <InputError message={error} className="mt-2" />
         </div>
     );
@@ -522,15 +517,4 @@ function TextareaField({ id, label, value, error, onChange }) {
             <InputError message={error} className="mt-2" />
         </div>
     );
-}
-
-function sumCredits(teams) {
-    return teams.reduce((total, team) => total + Number(team.credit_balance ?? 0), 0);
-}
-
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
 }

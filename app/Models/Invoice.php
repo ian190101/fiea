@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Invoice extends Model
 {
@@ -40,12 +41,26 @@ class Invoice extends Model
             'sent_at' => 'datetime',
             'paid_at' => 'datetime',
             'locked_at' => 'datetime',
+            'snapshot' => 'array',
+            'version' => 'integer',
+            'issued_on' => 'date',
+            'due_on' => 'date',
         ];
     }
 
     public function tripPhase()
     {
         return $this->belongsTo(TripPhase::class);
+    }
+
+    public function billingCase(): BelongsTo
+    {
+        return $this->belongsTo(BillingCase::class);
+    }
+
+    public function initialInvoice(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'initial_invoice_id');
     }
 
     public function contactPerson()

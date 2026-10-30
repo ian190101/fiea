@@ -1,0 +1,33 @@
+{
+    "coinciden": true,
+    "tablas": {
+        "billing_cases": {
+            "filas": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "invoices": {
+            "filas": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "treasury_payments": {
+            "filas": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "credit_accounts": {
+            "filas": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "credit_entries": {
+            "filas": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "accounting_reviews": {
+            "filas": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "identidad_y_acceso_usuarios": {
+            "filas": 2,
+            "sha256": "c3583d596f3f20fd1798422702e7283e306acd6dbc110986b52400c6026cbdbf"
+        }
+    }
+}

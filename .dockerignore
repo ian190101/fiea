@@ -29,3 +29,6 @@ coverage
 *.bak
 Thumbs.db
 .DS_Store
+graphify-out
+verification
+tests

@@ -9,3 +9,6 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# Los parches conservan literalmente la indentación del código de terceros.
+patches/*.patch -whitespace

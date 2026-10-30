@@ -1,0 +1,19 @@
+{
+  "casos": 4,
+  "conformes": 4,
+  "fallos_contrato": 0,
+  "errores_ejecucion": 0,
+  "composer_avisos": 0,
+  "npm_avisos": 0,
+  "paquetes_php_verificados": 127,
+  "dependencias_js_directas_verificadas": 16,
+  "archivos_bloqueo": {
+    "composer.lock": "9dc9d42ff491c5c7ef9e2c185ee10f878296ef1b668c35cf7e74d8a40484566b",
+    "package-lock.json": "5d591dac312770ccbc5bd11f10e2f8fe445d4b3cfd8bd038aaae5b9334ded8fa"
+  },
+  "fuentes": [
+    "composer-audit.json",
+    "npm-audit.json"
+  ],
+  "alcance": "Consultas oficiales guardadas después de las actualizaciones; sin omitir dependencias de desarrollo ni suprimir avisos."
+}

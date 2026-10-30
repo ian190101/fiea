@@ -36,7 +36,7 @@ export default function OperationsIndex({ health = { checks: [] } }) {
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <p className="text-sm font-bold uppercase tracking-wide text-app-muted">Resumen operativo</p>
-                            <h2 className="mt-2 text-2xl font-black">Salud general: {statusLabels[health.overall] ?? health.overall}</h2>
+                            <h2 className="mt-2 text-2xl font-black">Salud general: {statusLabels[health.overall] ?? 'Desconocido'}</h2>
                             <p className="mt-2 text-sm text-app-muted">Ultima revision: {formatDateTime(health.checked_at)}</p>
                         </div>
                         <div className="grid grid-cols-3 gap-3 sm:min-w-[360px]">
@@ -76,8 +76,8 @@ function HealthCard({ check }) {
                     <h2 className="text-xl font-black">{check.name}</h2>
                     <p className="mt-2 text-sm leading-6 text-app-muted">{check.detail}</p>
                 </div>
-                <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black uppercase ${statusStyles[check.status]}`}>
-                    {statusLabels[check.status] ?? check.status}
+                <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black uppercase ${statusStyles[check.status] ?? statusStyles.warning}`}>
+                    {statusLabels[check.status] ?? 'Desconocido'}
                 </span>
             </div>
 

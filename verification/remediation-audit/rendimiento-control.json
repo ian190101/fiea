@@ -1,0 +1,8 @@
+{
+    "expedientes_pequeno": 1,
+    "consultas_pequeno": 13,
+    "expedientes_grande": 26,
+    "filas_por_pagina": 25,
+    "consultas_grande": 13,
+    "resumen_anual_en_recorrido": false
+}

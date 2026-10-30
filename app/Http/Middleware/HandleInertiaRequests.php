@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\SystemSetting;
 use App\Models\SystemNotification;
 use App\Services\BrandingAssetService;
+use App\Services\LiquidGlassSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
@@ -41,6 +41,7 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            'liquidGlass' => fn () => app(LiquidGlassSettings::class)->current(),
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,
@@ -49,6 +50,8 @@ class HandleInertiaRequests extends Middleware
                     'email' => $user->email,
                     'theme_preference' => $user->theme_preference,
                     'is_active' => $user->is_active,
+                    'must_change_password' => $user->must_change_password,
+                    'scope_all' => $user->scope_all,
                     'roles' => $user->roles
                         ->map(fn ($role) => [
                             'id' => $role->id,
@@ -110,7 +113,8 @@ class HandleInertiaRequests extends Middleware
 
     /**
      * @template T
-     * @param callable(): T $callback
+     *
+     * @param  callable(): T  $callback
      * @return T
      */
     private function remember(string $key, int $seconds, callable $callback): mixed

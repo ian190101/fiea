@@ -27,7 +27,7 @@ class RbacSuperadminTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_superadmin_role_bypasses_permission_checks(): void
+    public function test_superadmin_role_requires_explicit_permission(): void
     {
         Permission::query()->create([
             'code' => 'settings.manage',
@@ -44,7 +44,7 @@ class RbacSuperadminTest extends TestCase
 
         $this->actingAs($user)
             ->get('/configuracion')
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_superadmin_can_view_module_with_permission(): void
@@ -60,7 +60,7 @@ class RbacSuperadminTest extends TestCase
     {
         [$admin, $role] = $this->createSuperadminContext();
 
-        $this->actingAs($admin)
+        $this->actingAs($admin)->withSession(['auth.password_confirmed_at' => time()])
             ->post(route('superadmin.users.store'), [
                 'name' => 'Accounting User',
                 'username' => 'accounting_user',
@@ -94,7 +94,7 @@ class RbacSuperadminTest extends TestCase
             'name' => 'Gestionar configuracion',
         ]);
 
-        $this->actingAs($admin)
+        $this->actingAs($admin)->withSession(['auth.password_confirmed_at' => time()])
             ->patch(route('superadmin.roles.update', $role->id), [
                 'name' => 'Administrativo',
                 'description' => 'Rol administrativo',
@@ -117,7 +117,7 @@ class RbacSuperadminTest extends TestCase
     {
         [$admin, $role] = $this->createSuperadminContext();
 
-        $this->actingAs($admin)
+        $this->actingAs($admin)->withSession(['auth.password_confirmed_at' => time()])
             ->patch(route('superadmin.users.update', $admin->id), [
                 'name' => $admin->name,
                 'username' => $admin->username,
@@ -128,7 +128,8 @@ class RbacSuperadminTest extends TestCase
                 'is_active' => false,
                 'role_ids' => [$role->id],
             ])
-            ->assertSessionHasErrors('user');
+            ->assertStatus(422);
+        $this->assertTrue($admin->fresh()->is_active);
     }
 
     /**
@@ -156,7 +157,9 @@ class RbacSuperadminTest extends TestCase
             'username' => 'superadmin_user',
             'is_active' => true,
         ]);
+        $superadminRole->permissions()->attach($permission);
         $user->roles()->attach($superadminRole);
+        $user->forceFill(['scope_all' => true])->save();
 
         return [$user, $role, $permission];
     }

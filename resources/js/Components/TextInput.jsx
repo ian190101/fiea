@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import LiquidDateInput from '@/Components/Glass/LiquidDateInput';
 
 export default forwardRef(function TextInput(
     { type = 'text', className = '', isFocused = false, ...props },
@@ -16,12 +17,14 @@ export default forwardRef(function TextInput(
         }
     }, [isFocused]);
 
+    if (type === 'date') return <LiquidDateInput {...props} className={`ios-field min-h-11 ${className}`} ref={localRef} />;
+
     return (
         <input
             {...props}
             type={type}
             className={
-                'rounded-xl border-app-border bg-white/70 text-app-text shadow-sm placeholder:text-app-muted/70 focus:border-brand-primary focus:ring-brand-primary dark:bg-white/10 ' +
+                'lg-micro-glass ios-field min-h-11 placeholder:text-app-muted/70 aria-[invalid=true]:border-red-700 dark:aria-[invalid=true]:border-red-300 ' +
                 className
             }
             ref={localRef}

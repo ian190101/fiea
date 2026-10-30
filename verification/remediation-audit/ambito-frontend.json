@@ -1,0 +1,46 @@
+{
+  "casos": 3,
+  "conformes": 3,
+  "fallos_contrato": 0,
+  "errores_ejecucion": 0,
+  "resultados": [
+    {
+      "nombre": "selección posterior a 25, búsqueda remota y conservación de concesiones",
+      "observado": {
+        "posts": [
+          {
+            "url": "/superadmin.users.scope/7",
+            "data": {
+              "scope_all": false,
+              "project_ids": [
+                26,
+                77
+              ],
+              "chapter_ids": []
+            }
+          }
+        ],
+        "cerrado": true
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "revocación completa conserva listas vacías explícitas",
+      "observado": {
+        "scope_all": false,
+        "project_ids": [],
+        "chapter_ids": []
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "fallo de búsqueda se presenta y permite recuperar opciones sin perder selección",
+      "observado": {
+        "seleccion_conservada": true,
+        "busqueda_recuperada": true
+      },
+      "estado": "conforme"
+    }
+  ],
+  "limite": "Chrome temporal; React, formularios y selectores reales. Contexto y transporte Inertia simulados; permisos verificados por pruebas HTTP."
+}

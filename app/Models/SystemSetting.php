@@ -14,11 +14,13 @@ class SystemSetting extends Model
         'lock_final_invoice_by_default',
         'accounting_can_edit_summary',
         'updated_by_id',
+        'liquid_glass',
     ];
 
     protected function casts(): array
     {
         return [
+            'liquid_glass' => 'array',
             'lock_final_invoice_by_default' => 'boolean',
             'accounting_can_edit_summary' => 'boolean',
         ];

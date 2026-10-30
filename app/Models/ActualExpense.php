@@ -24,8 +24,8 @@ class ActualExpense extends Model
     protected function casts(): array
     {
         return [
-            'final_unit_cost' => 'decimal:2',
-            'final_quantity' => 'decimal:2',
+            'final_unit_cost' => 'decimal:4',
+            'final_quantity' => 'decimal:4',
             'real_total' => 'decimal:2',
             'reported_at' => 'datetime',
         ];

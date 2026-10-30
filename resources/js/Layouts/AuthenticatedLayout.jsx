@@ -1,11 +1,16 @@
 import ApplicationLogo from '@/Components/ApplicationLogo';
+import { readPreference, writePreference } from '@/Utils/preferences';
 import ThemeToggle from '@/Components/ThemeToggle';
+import WorkflowGuideCard from '@/Components/WorkflowGuideCard';
+import HelpTooltip from '@/Components/HelpTooltip';
 import { Link, usePage } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { applyTheme, hexToRgb } from '@/Utils/theme';
+import GlassScene, { MacroGlass } from '@/Components/Glass/GlassScene';
+import { moduleFlow } from '@/Content/moduleFlows';
 
 const navigation = [
-    { label: 'Panel', route: 'dashboard', icon: DashboardIcon },
+    { label: 'Panel', route: 'dashboard', icon: DashboardIcon, permissions: ['dashboard.view'] },
     { label: 'Notificaciones', route: 'notifications.index', icon: NotificationIcon },
     { label: 'Catalogos', route: 'catalogs.index', icon: CatalogIcon, permissions: ['catalogs.view', 'catalogs.manage'] },
     { label: 'Capitulos', route: 'chapters.index', icon: ChapterIcon, permissions: ['chapters.view', 'chapters.manage'] },
@@ -18,6 +23,7 @@ const navigation = [
     { label: 'Gastos', route: 'actual-expenses.index', icon: ExpenseIcon, permissions: ['actual_expenses.view', 'actual_expenses.manage'] },
     { label: 'Recibos', route: 'receipts.index', icon: ReceiptIcon, permissions: ['receipts.view', 'receipts.manage'] },
     { label: 'Contabilidad', route: 'accounting.index', icon: AccountingIcon, permissions: ['accounting.view', 'accounting.manage'] },
+    { label: 'Control anual', href: '/accounting/control', icon: AccountingIcon, permissions: ['accounting.view', 'accounting.manage'] },
     { label: 'Reportes', route: 'reports.index', icon: ReportIcon, permissions: ['reports.view'] },
     { label: 'Alertas', route: 'alerts.index', icon: AlertIcon, permissions: ['alerts.view'] },
     { label: 'Auditoria', route: 'audit-logs.index', icon: AuditIcon, permissions: ['audit_logs.view'] },
@@ -25,174 +31,134 @@ const navigation = [
     { label: 'Backups', route: 'backups.index', icon: BackupIcon, permissions: ['backups.view', 'backups.manage'] },
     { label: 'Config', route: 'system-settings.edit', icon: SettingsIcon, permissions: ['settings.manage'] },
     { label: 'Superadmin', route: 'superadmin.index', icon: SuperadminIcon, permissions: ['superadmin.manage'] },
+    { label: 'Estudio Liquid Glass', route: 'liquid-glass.edit', icon: SettingsIcon, superadminOnly: true },
 ];
 
-export default function AuthenticatedLayout({ header, children }) {
-    const { auth, branding, notifications } = usePage().props;
+export default function AuthenticatedLayout({ header, children, brandingPreview }) {
+    const { auth, branding, notifications, liquidGlass } = usePage().props;
     const user = auth.user;
     const permissionCodes = auth.permissions ?? [];
     const permissionSet = useMemo(() => new Set(permissionCodes), [permissionCodes]);
-    const visibleNavigation = useMemo(() => {
-        if (permissionCodes.length === 0) {
-            return navigation;
-        }
-
-        return navigation.filter((item) => !item.permissions || item.permissions.some((permission) => permissionSet.has(permission)));
-    }, [permissionCodes.length, permissionSet]);
+    const visibleNavigation = useMemo(
+        () => navigation.filter((item) => (!item.superadminOnly || user.roles?.some((role) => role.code === 'superadmin')) && (!item.permissions || item.permissions.some((permission) => permissionSet.has(permission)))),
+        [permissionSet, user.roles],
+    );
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const menuRef = useRef(null);
 
+    useEffect(() => {
+        if (!isMobileOpen) return undefined;
+        const previous = document.activeElement;
+        const overflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        menuRef.current?.querySelector('button')?.focus();
+        const trap = (event) => {
+            if (event.key === 'Escape') { setIsMobileOpen(false); return; }
+            if (event.key !== 'Tab') return;
+            const controls = Array.from(menuRef.current?.querySelectorAll('button,a[href],input') ?? []).filter((element) => element.getClientRects().length);
+            const first = controls[0], last = controls.at(-1);
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        };
+        document.addEventListener('keydown', trap);
+        return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', trap); previous?.focus(); };
+    }, [isMobileOpen]);
     const cssVariables = useMemo(
         () => ({
-            '--brand-primary': hexToRgb(branding.primaryColor),
-            '--brand-secondary': hexToRgb(branding.secondaryColor),
-            '--brand-accent': hexToRgb(branding.accentColor),
+            '--brand-primary': hexToRgb(brandingPreview?.primaryColor ?? branding.primaryColor),
+            '--brand-secondary': hexToRgb(brandingPreview?.secondaryColor ?? branding.secondaryColor),
+            '--brand-accent': hexToRgb(brandingPreview?.accentColor ?? branding.accentColor),
         }),
-        [branding],
+        [branding, brandingPreview],
     );
 
     useEffect(() => {
-        const theme = user?.theme_preference ?? localStorage.getItem('theme_preference') ?? 'light';
-        localStorage.setItem('theme_preference', theme);
+        const theme = user?.theme_preference ?? readPreference('theme_preference', 'light');
+        writePreference('theme_preference', theme);
         applyTheme(theme);
     }, [user?.theme_preference]);
 
-    return (
-        <div className="app-shell min-h-screen bg-app-bg text-app-text" style={cssVariables}>
-            <div className="app-ambient-bg pointer-events-none fixed inset-0 z-0" />
+    useEffect(() => {
+        const media = window.matchMedia('(min-width:768px)');
+        const close = () => { if (media.matches) setIsMobileOpen(false); };
+        media.addEventListener('change', close);
+        return () => media.removeEventListener('change', close);
+    }, []);
 
-            <button
-                type="button"
-                className="glass-button fixed left-4 top-4 z-40 lg:hidden"
-                onClick={() => setIsMobileOpen(true)}
-            >
-                <MenuIcon className="h-5 w-5" />
+    const renderNavigation = (collapsed, closeMenu) => <>
+        <div className={`relative flex h-20 shrink-0 items-center px-4 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+            <Link href="/" onClick={closeMenu} aria-label="Inicio de FIEA" className="flex min-w-0 items-center gap-3">
+                {branding.logoUrl ? <img crossOrigin="anonymous" src={branding.logoUrl} alt="" className="h-11 w-11 rounded-2xl object-contain" />
+                    : <ApplicationLogo className="h-11 w-11 shrink-0 fill-current text-brand-primary" />}
+                {!collapsed && <div className="min-w-0"><p className="truncate text-base font-black">FIEA</p><p className="truncate text-xs font-semibold text-app-muted">Invoices & Budget</p></div>}
+            </Link>
+            <button type="button" className="hidden rounded-2xl border border-white/40 bg-white/30 p-2 text-app-muted md:block"
+                onClick={() => setIsCollapsed((value) => !value)}
+                aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}>
+                <ChevronIcon className={`h-4 w-4 ${collapsed ? 'rotate-180' : ''}`} />
             </button>
-
-            {isMobileOpen && (
-                <button
-                    type="button"
-                    aria-label="Cerrar menu"
-                    className="fixed inset-0 z-40 bg-stone-950/40 lg:hidden"
-                    onClick={() => setIsMobileOpen(false)}
-                />
-            )}
-
-            <aside
-                className={`glass-panel fixed inset-y-4 left-4 z-50 flex min-h-0 flex-col overflow-hidden rounded-[2rem] transition-[width,transform] duration-300 will-change-[width,transform] lg:translate-x-0 ${
-                    isCollapsed ? 'lg:w-20' : 'lg:w-72'
-                } ${isMobileOpen ? 'w-72 translate-x-0' : '-translate-x-[115%] lg:translate-x-0'}`}
-            >
-                <div className={`relative flex h-20 shrink-0 items-center px-4 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-                    <Link href="/" className={`flex min-w-0 items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                        {branding.logoUrl ? (
-                            <img src={branding.logoUrl} alt="FIEA" className="h-11 w-11 rounded-2xl object-contain" />
-                        ) : (
-                            <ApplicationLogo className="h-11 w-11 shrink-0 fill-current text-brand-primary" />
-                        )}
-                        {!isCollapsed && (
-                            <div className="min-w-0">
-                                <p className="truncate text-base font-black">FIEA</p>
-                                <p className="truncate text-xs font-semibold text-app-muted">Invoices & Budget</p>
-                            </div>
-                        )}
-                    </Link>
-
-                    <button
-                        type="button"
-                        className={`hidden rounded-2xl border border-white/40 bg-white/30 p-2 text-app-muted transition hover:text-app-text lg:block dark:border-white/10 dark:bg-white/10 ${
-                            isCollapsed ? 'absolute -right-3 top-6 bg-white/70 shadow-lg dark:bg-stone-900/80' : ''
-                        }`}
-                        onClick={() => setIsCollapsed((value) => !value)}
-                        aria-label={isCollapsed ? 'Expandir menu' : 'Colapsar menu'}
-                    >
-                        <ChevronIcon className={`h-4 w-4 transition ${isCollapsed ? 'rotate-180' : ''}`} />
-                    </button>
+        </div>
+        <nav aria-label="Navegación principal" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pr-2">
+            {visibleNavigation.map((item) => {
+                const Icon = item.icon;
+                const active = item.route ? route().current(item.route) : window.location.pathname === item.href;
+                return <Link key={item.label} href={item.href ?? route(item.route)} onClick={closeMenu}
+                    aria-label={item.label} aria-current={active ? 'page' : undefined}
+                    className={`lg-micro-glass dock-link group relative flex h-12 items-center gap-3 rounded-2xl px-3 text-sm font-bold ${active ? 'dock-link-active text-white' : 'text-app-muted hover:text-app-text'}`}>
+                    <Icon className="h-5 w-5 shrink-0" />
+                    {!collapsed && <span>{item.label}</span>}
+                    {item.route === 'notifications.index' && notifications?.unread > 0 &&
+                        <span className={`${collapsed ? 'absolute right-2 top-2' : 'ml-auto'} rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white`}>
+                            {notifications.unread > 99 ? '99+' : notifications.unread}
+                        </span>}
+                </Link>;
+            })}
+        </nav>
+        <div className={`shrink-0 border-t border-white/20 ${collapsed ? 'space-y-2 p-2' : 'space-y-3 p-4'}`}>
+            <div className={collapsed ? 'flex justify-center' : 'glass-tile flex items-center justify-between p-3'}>
+                {!collapsed && <span className="text-sm font-bold">Apariencia</span>}
+                <ThemeToggle compact={collapsed} />
+            </div>
+            <div className={collapsed ? 'space-y-2' : 'glass-tile space-y-3 p-3'}>
+                {!collapsed && <p className="truncate text-sm font-bold">{user.name} <span className="font-normal">@{user.username}</span></p>}
+                <div className={`flex gap-2 ${collapsed ? 'flex-col' : ''}`}>
+                    <Link href={route('profile.edit')} onClick={closeMenu} aria-label="Perfil" className="glass-button flex-1 px-2">{collapsed ? 'P' : 'Perfil'}</Link>
+                    <Link href={route('logout')} method="post" as="button" onClick={closeMenu} aria-label="Salir" className="glass-button flex-1 px-2">{collapsed ? 'S' : 'Salir'}</Link>
                 </div>
-
-                <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pr-2 [scrollbar-width:thin]">
-                    {visibleNavigation.map((item) => {
-                        const Icon = item.icon;
-                        const active = route().current(item.route);
-
-                        return (
-                            <Link
-                                key={item.label}
-                                href={route(item.route)}
-                                className={`group relative flex h-12 items-center gap-3 rounded-2xl px-3 text-sm font-bold transition ${
-                                    active
-                                        ? 'bg-brand-primary text-white shadow-lg shadow-stone-950/10'
-                                        : 'text-app-muted hover:bg-white/35 hover:text-app-text dark:hover:bg-white/10'
-                                }`}
-                                onClick={() => setIsMobileOpen(false)}
-                            >
-                                <Icon className="h-5 w-5 shrink-0" />
-                                {!isCollapsed && <span>{item.label}</span>}
-                                {item.route === 'notifications.index' && notifications?.unread > 0 && (
-                                    <span className={`${isCollapsed ? 'absolute right-2 top-2' : 'ml-auto'} rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white`}>
-                                        {notifications.unread > 99 ? '99+' : notifications.unread}
-                                    </span>
-                                )}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                <div className={`shrink-0 border-t border-white/20 dark:border-white/10 ${isCollapsed ? 'space-y-3 p-2' : 'space-y-4 p-4'}`}>
-                    <div className={isCollapsed ? 'flex justify-center' : 'glass-tile p-3'}>
-                        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-                            {!isCollapsed && (
-                                <div>
-                                    <p className="text-xs font-bold uppercase text-app-muted">Apariencia</p>
-                                    <p className="text-sm font-bold">Liquid glass</p>
-                                </div>
-                            )}
-                            <ThemeToggle compact={isCollapsed} />
-                        </div>
-                    </div>
-
-                    <div className={isCollapsed ? 'flex justify-center' : 'glass-tile p-3'}>
-                        <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-secondary text-sm font-black text-white">
-                                {user.name?.charAt(0) ?? 'U'}
-                            </div>
-                            {!isCollapsed && (
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-black">{user.name}</p>
-                                    <p className="truncate text-xs font-semibold text-app-muted">@{user.username}</p>
-                                </div>
-                            )}
-                        </div>
-                        {!isCollapsed && (
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                <Link href={route('profile.edit')} className="glass-button px-3 py-2 text-xs">
-                                    Perfil
-                                </Link>
-                                <Link href={route('logout')} method="post" as="button" className="glass-button px-3 py-2 text-xs">
-                                    Salir
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </aside>
-
-            <div className={`relative z-10 transition-all duration-300 ${isCollapsed ? 'lg:pl-28' : 'lg:pl-80'}`}>
-                {header && (
-                    <header className="px-4 pb-4 pt-20 sm:px-6 lg:px-8 lg:pt-8">
-                        {header}
-                    </header>
-                )}
-
-                <main className="px-4 pb-10 sm:px-6 lg:px-8">{children}</main>
             </div>
         </div>
-    );
-}
+    </>;
 
+    const currentModule = window.location.pathname.split('/').filter(Boolean)[0] ?? 'dashboard';
+    const currentLabel = navigation.find((item) => item.href === window.location.pathname || (item.route && route().current(item.route)))?.label ?? (currentModule === 'perfil' ? 'Perfil' : 'Módulo');
+    const flow = moduleFlow(window.location.pathname, currentLabel);
+    const guideSteps = flow.steps.map((step, index) => ({ id: `${currentModule}-${index}`, text: step }));
+
+    return <GlassScene profiles={liquidGlass} className={`app-shell authenticated-scene text-app-text ${isMobileOpen ? 'mobile-menu-open' : ''} ${isCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`} style={cssVariables}>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] glass-button">Saltar al contenido</a>
+        <MacroGlass as="aside" id="mobile-navigation" profile="sidebar" className="app-navigation optical-dock" config={{ floating: false, button: false }} role={isMobileOpen ? 'dialog' : undefined} aria-modal={isMobileOpen || undefined} aria-label="Navegación de FIEA">
+            <div ref={menuRef} className="dock-reading-layer">
+                <button type="button" className="glass-button mobile-close" onClick={() => setIsMobileOpen(false)}>Cerrar menú <span aria-hidden="true">×</span></button>
+                {renderNavigation(isMobileOpen ? false : isCollapsed, () => setIsMobileOpen(false))}
+            </div>
+        </MacroGlass>
+        <button type="button" className="app-navigation glass-button fixed left-4 top-4 z-40 md:hidden"
+            aria-label="Abrir navegación" aria-expanded={isMobileOpen} aria-controls="mobile-navigation"
+            onClick={() => setIsMobileOpen(true)}><MenuIcon className="h-5 w-5" /></button>
+        <MacroGlass as="header" className="scene-header scene-push" config={{ floating: false, button: false }}><div className="flex items-center justify-between gap-3">{header ?? <h1>{currentLabel}</h1>}<HelpTooltip label={`Ayuda de ${currentLabel}`} text={`${flow.purpose} ${flow.result}`} /></div></MacroGlass>
+        <MacroGlass className="scene-guide scene-push" config={{ floating: false, button: false }}>
+            <WorkflowGuideCard bare guideKey={window.location.pathname} userId={user.id} title={flow.purpose} summary={flow.result} result={flow.result} steps={guideSteps} />
+        </MacroGlass>
+            <main id="main-workspace" tabIndex={-1} className="app-content scene-push" inert={isMobileOpen ? '' : undefined}>
+                <span id="main-content" />
+                {children}
+            </main>
+    </GlassScene>;
+}
 function IconBase({ className = '', children }) {
     return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className={className}>
             {children}
         </svg>
     );

@@ -1,0 +1,75 @@
+
+> build
+> php artisan ziggy:generate resources/js/ziggy.js --silent && vite build
+
+vite v6.4.5 building for production...
+transforming...
+✓ 1079 modules transformed.
+rendering chunks...
+computing gzip size...
+public/build/manifest.json                                     30.61 kB │ gzip:   2.67 kB
+public/build/assets/ErrorService-FTInJepT.css                  84.71 kB │ gzip:  16.44 kB
+public/build/assets/error-BGcXZGtg.js                           0.18 kB │ gzip:   0.17 kB
+public/build/assets/InputError-BLnl6agk.js                      0.20 kB │ gzip:   0.18 kB
+public/build/assets/money-DYfGZ-TT.js                           0.41 kB │ gzip:   0.29 kB
+public/build/assets/useOptionCollection-BfxcmJX6.js             0.41 kB │ gzip:   0.29 kB
+public/build/assets/PrimaryButton-_bnva3c0.js                   0.50 kB │ gzip:   0.32 kB
+public/build/assets/Register-B_SPlpjd.js                        0.55 kB │ gzip:   0.36 kB
+public/build/assets/EmptyState-BpmKWU1A.js                      0.57 kB │ gzip:   0.37 kB
+public/build/assets/LiquidToggle-gtKHmjoy.js                    0.61 kB │ gzip:   0.36 kB
+public/build/assets/Welcome-Bkjv7jA1.js                         0.63 kB │ gzip:   0.43 kB
+public/build/assets/TextInput-T0XxTS_H.js                       0.68 kB │ gzip:   0.44 kB
+public/build/assets/workflows-DvlcMmAS.js                       0.89 kB │ gzip:   0.52 kB
+public/build/assets/CursorPager-DuTUaRws.js                     0.92 kB │ gzip:   0.48 kB
+public/build/assets/useUnsavedChangesGuard-D-e7-SCW.js          1.00 kB │ gzip:   0.58 kB
+public/build/assets/FinancialActionSheet-DY7Nip4x.js            1.08 kB │ gzip:   0.56 kB
+public/build/assets/GlassSegmentedControl-DnfSmj6z.js           1.17 kB │ gzip:   0.68 kB
+public/build/assets/VerifyEmail-CMuc-6UI.js                     1.21 kB │ gzip:   0.67 kB
+public/build/assets/Start-bMalY0Pz.js                           1.67 kB │ gzip:   0.84 kB
+public/build/assets/IconButton-CXFkLmXW.js                      1.71 kB │ gzip:   0.97 kB
+public/build/assets/ConfirmPassword-C0NwOC8C.js                 1.81 kB │ gzip:   0.94 kB
+public/build/assets/ForgotPassword-B_qq_9XP.js                  1.86 kB │ gzip:   0.99 kB
+public/build/assets/financialHelp-CneNbD63.js                   1.95 kB │ gzip:   0.97 kB
+public/build/assets/HelpTooltip-CLsbZcLV.js                     2.16 kB │ gzip:   1.02 kB
+public/build/assets/InputLabel-D4HhhLaj.js                      2.21 kB │ gzip:   1.19 kB
+public/build/assets/GuestLayout-CD87OO3n.js                     2.23 kB │ gzip:   1.20 kB
+public/build/assets/useLocalTable-BOumbyrL.js                   2.34 kB │ gzip:   1.15 kB
+public/build/assets/ResetPassword-mc-n0WkF.js                   2.82 kB │ gzip:   1.14 kB
+public/build/assets/UpdatePasswordForm-BfWU86fA.js              2.91 kB │ gzip:   1.02 kB
+public/build/assets/DeleteUserForm-DIH4z43b.js                  3.40 kB │ gzip:   1.50 kB
+public/build/assets/Index-DuYe09FG.js                           3.45 kB │ gzip:   1.37 kB
+public/build/assets/UpdateProfileInformationForm-DjHuixCa.js    3.63 kB │ gzip:   1.52 kB
+public/build/assets/Operation-BXw-HaR-.js                       3.74 kB │ gzip:   1.80 kB
+public/build/assets/LiquidDateInput-B0zKKNLq.js                 3.83 kB │ gzip:   1.65 kB
+public/build/assets/Dashboard-DuDvH4W6.js                       4.03 kB │ gzip:   1.30 kB
+public/build/assets/Edit-WAcLAcOP.js                            4.04 kB │ gzip:   1.47 kB
+public/build/assets/Index-D-uptCTH.js                           4.78 kB │ gzip:   1.86 kB
+public/build/assets/Login-CPLO2V84.js                           5.25 kB │ gzip:   2.21 kB
+public/build/assets/Index-F9zJQYS7.js                           6.27 kB │ gzip:   2.24 kB
+public/build/assets/Index-Bi2oGdmy.js                           6.39 kB │ gzip:   2.37 kB
+public/build/assets/Control-DKJJygf1.js                         6.64 kB │ gzip:   2.51 kB
+public/build/assets/Index-zf5En--N.js                           7.14 kB │ gzip:   2.45 kB
+public/build/assets/LiquidSelect-DJJhUwQA.js                    7.34 kB │ gzip:   3.08 kB
+public/build/assets/Index-CCMCN0VQ.js                           7.61 kB │ gzip:   2.45 kB
+public/build/assets/LiquidGlass-C0xT24V1.js                     8.45 kB │ gzip:   3.33 kB
+public/build/assets/Edit-Dd6hQ6kW.js                           10.01 kB │ gzip:   3.34 kB
+public/build/assets/Index-F7jJZj1k.js                          10.40 kB │ gzip:   3.57 kB
+public/build/assets/Index-CoYnjVBj.js                          10.73 kB │ gzip:   3.56 kB
+public/build/assets/Index-DkECSitm.js                          12.21 kB │ gzip:   3.94 kB
+public/build/assets/Index-DhFaVcwz.js                          12.34 kB │ gzip:   4.08 kB
+public/build/assets/Index-CBbKCCHJ.js                          12.39 kB │ gzip:   3.98 kB
+public/build/assets/Index-QrG2UioZ.js                          12.66 kB │ gzip:   4.05 kB
+public/build/assets/Index-Ci-8mVNi.js                          12.79 kB │ gzip:   3.51 kB
+public/build/assets/Index-5EvOczyb.js                          13.27 kB │ gzip:   4.19 kB
+public/build/assets/Index-DsssPAdz.js                          13.31 kB │ gzip:   4.18 kB
+public/build/assets/Show-CX_KynB1.js                           13.99 kB │ gzip:   4.83 kB
+public/build/assets/transition-DfDK-7QU.js                     14.95 kB │ gzip:   5.92 kB
+public/build/assets/Index-Kutv5YZj.js                          15.83 kB │ gzip:   4.30 kB
+public/build/assets/Index-BZ2Yql95.js                          18.75 kB │ gzip:   5.55 kB
+public/build/assets/AuthenticatedLayout-C-VaIVJL.js            19.31 kB │ gzip:   6.40 kB
+public/build/assets/Index-BpbpGKGc.js                          19.64 kB │ gzip:   5.94 kB
+public/build/assets/dialog-BOfbJDtP.js                         30.29 kB │ gzip:  10.98 kB
+public/build/assets/app-C5_-8oL4.js                            40.33 kB │ gzip:  13.04 kB
+public/build/assets/GlassScene-50W_8JZc.js                     65.98 kB │ gzip:  22.09 kB
+public/build/assets/ErrorService-DToasfep.js                  450.26 kB │ gzip: 144.55 kB
+✓ built in 17.78s

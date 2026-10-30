@@ -1,19 +1,36 @@
+import { useOptionCollection } from '@/Utils/useOptionCollection';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TableControls from '@/Components/TableControls';
 import TextInput from '@/Components/TextInput';
+import EmptyState from '@/Components/EmptyState';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
+import CursorPager from '@/Components/CursorPager';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export default function ContactIndex({ contacts = [], assignments = [], chapters = [], teams = [], roleOptions = [] }) {
+export default function ContactIndex({ contacts: contactPage = [], assignments: assignmentPage = [], chapters: initialchapters = [], teams: initialteams = [], roleOptions = [], selected_id = null }) {
+    const chapters = useOptionCollection(initialchapters, 'chapters');
+    const teams = useOptionCollection(initialteams, 'teams');
+    const contacts = Array.isArray(contactPage) ? contactPage : (contactPage?.data ?? []);
+    const assignments = Array.isArray(assignmentPage) ? assignmentPage : (assignmentPage?.data ?? []);
     const { flash } = usePage().props;
     const [editingContact, setEditingContact] = useState(null);
     const [editingAssignment, setEditingAssignment] = useState(null);
-    const [selectedContactId, setSelectedContactId] = useState(contacts[0]?.id ?? '');
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+    const [selectedContactId, setSelectedContactId] = useState(
+        contacts.some((contact) => String(contact.id) === String(selected_id)) ? selected_id : (contacts[0]?.id ?? ''),
+    );
+    useEffect(() => {
+        setSelectedContactId((current) => contacts.some((contact) => String(contact.id) === String(current))
+            ? current : (contacts.find((contact) => String(contact.id) === String(selected_id))?.id ?? contacts[0]?.id ?? ''));
+    }, [contacts, selected_id]);
 
     const selectedContact = useMemo(
         () => contacts.find((contact) => String(contact.id) === String(selectedContactId)) ?? null,
@@ -151,10 +168,7 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
     };
 
     const deleteContact = (contact) => {
-        if (!window.confirm(`Eliminar "${contact.full_name}"?`)) {
-            return;
-        }
-
+        setDeleting(true);
         router.delete(route('contacts.destroy', contact.id), {
             preserveScroll: true,
             onSuccess: () => {
@@ -162,14 +176,12 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
                     resetContactForm();
                 }
             },
+            onFinish: () => { setDeleting(false); setPendingDelete(null); },
         });
     };
 
     const deleteAssignment = (assignment) => {
-        if (!window.confirm(`Eliminar asignacion "${assignment.role}"?`)) {
-            return;
-        }
-
+        setDeleting(true);
         router.delete(route('contact-assignments.destroy', assignment.id), {
             preserveScroll: true,
             onSuccess: () => {
@@ -177,6 +189,7 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
                     resetAssignmentForm();
                 }
             },
+            onFinish: () => { setDeleting(false); setPendingDelete(null); },
         });
     };
 
@@ -199,6 +212,10 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
             }
         >
             <Head title="Contactos" />
+            <FinancialActionSheet open={Boolean(pendingDelete)} title={pendingDelete?.kind === 'contact' ? 'Eliminar contacto' : 'Eliminar asignación'}
+                description={pendingDelete ? `Se eliminará ${pendingDelete.kind === 'contact' ? pendingDelete.item.full_name : pendingDelete.item.role}. Esta acción no se puede deshacer.` : ''}
+                confirmLabel="Eliminar" busy={deleting} onCancel={() => setPendingDelete(null)}
+                onConfirm={() => pendingDelete?.kind === 'contact' ? deleteContact(pendingDelete.item) : deleteAssignment(pendingDelete.item)} />
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
@@ -274,10 +291,12 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
                                 filtered={contactTable.filteredRows.length}
                                 placeholder="Buscar contacto"
                             />
+                            <CursorPager page={contactPage} label="contactos" />
                         </div>
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                <caption className="sr-only">Contactos y acciones disponibles</caption>
                                 <thead>
                                     <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                         <th className="px-5 py-4">Contacto</th>
@@ -301,15 +320,15 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
                                                 <div className="flex justify-end gap-2">
                                                     <IconButton icon="file" label="Ver asignaciones" type="button" onClick={() => chooseContact(contact.id)} />
                                                     <IconButton icon="edit" label="Editar contacto" type="button" onClick={() => editContact(contact)} />
-                                                    <IconButton icon="trash" label="Eliminar contacto" type="button" variant="danger" onClick={() => deleteContact(contact)} />
+                                                    <IconButton icon="trash" label="Eliminar contacto" type="button" variant="danger" onClick={() => setPendingDelete({ kind: 'contact', item: contact })} />
                                                 </div>
                                             </td>
                                         </tr>
                                     ))}
                                     {contactTable.filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan="4" className="px-5 py-10 text-center text-sm font-semibold text-app-muted">
-                                                Aun no hay contactos.
+                                            <td colSpan="4" className="px-5 py-10">
+                                                <EmptyState title={contacts.length ? 'Sin resultados para estos filtros' : 'Aún no hay contactos'} description={contacts.length ? 'Cambia la búsqueda.' : 'Crea un contacto para comenzar.'} />
                                             </td>
                                         </tr>
                                     )}
@@ -358,6 +377,7 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
                             />
                             <SelectField
                                 id="team_id"
+                                remoteParams={{chapter_id:assignmentForm.data.chapter_id || undefined}}
                                 label="Equipo"
                                 value={assignmentForm.data.team_id}
                                 options={availableTeams}
@@ -427,10 +447,12 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
                                 filtered={assignmentTable.filteredRows.length}
                                 placeholder="Buscar asignacion"
                             />
+                            <CursorPager page={assignmentPage} label="asignaciones" />
                         </div>
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                <caption className="sr-only">Asignaciones del contacto seleccionado</caption>
                                 <thead>
                                     <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                         <th className="px-5 py-4">Rol</th>
@@ -457,15 +479,15 @@ export default function ContactIndex({ contacts = [], assignments = [], chapters
                                             <td className="px-5 py-4">
                                                 <div className="flex justify-end gap-2">
                                                     <IconButton icon="edit" label="Editar asignacion" type="button" onClick={() => editAssignment(assignment)} />
-                                                    <IconButton icon="trash" label="Eliminar asignacion" type="button" variant="danger" onClick={() => deleteAssignment(assignment)} />
+                                                    <IconButton icon="trash" label="Eliminar asignacion" type="button" variant="danger" onClick={() => setPendingDelete({ kind: 'assignment', item: assignment })} />
                                                 </div>
                                             </td>
                                         </tr>
                                     ))}
                                     {assignmentTable.filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan="4" className="px-5 py-10 text-center text-sm font-semibold text-app-muted">
-                                                Aun no hay asignaciones para este contacto.
+                                            <td colSpan="4" className="px-5 py-10">
+                                                <EmptyState title="Sin asignaciones" description="Este contacto no tiene asignaciones para la búsqueda actual." />
                                             </td>
                                         </tr>
                                     )}
@@ -508,14 +530,17 @@ function FlashMessages({ flash }) {
     );
 }
 
-function SelectField({ id, label, value, options, error, onChange, emptyLabel = 'Seleccionar' }) {
+function SelectField({ id, label, value, options, error, onChange, remoteParams, emptyLabel = 'Seleccionar' }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
+                remoteParams={remoteParams}
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
                 className="mt-1 block w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
             >
                 <option value="">{emptyLabel}</option>
@@ -524,8 +549,8 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
                         {option.name}
                     </option>
                 ))}
-            </select>
-            <InputError message={error} className="mt-2" />
+            </LiquidSelect>
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }
@@ -539,9 +564,11 @@ function TextField({ id, label, value, error, onChange, type = 'text' }) {
                 type={type}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
                 className="mt-1 block w-full"
             />
-            <InputError message={error} className="mt-2" />
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }
@@ -554,9 +581,11 @@ function TextareaField({ id, label, value, error, onChange }) {
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
                 className="mt-1 block min-h-24 w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm placeholder:text-app-muted/70 focus:border-brand-primary focus:ring-brand-primary dark:bg-white/10"
             />
-            <InputError message={error} className="mt-2" />
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }

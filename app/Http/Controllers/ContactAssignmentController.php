@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\ContactAssignment;
 use App\Models\Team;
+use App\Http\Requests\SaveContactAssignmentRequest;
+use App\Actions\Contacts\SaveContactAssignment;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -11,63 +14,41 @@ use Illuminate\Validation\Rule;
 
 class ContactAssignmentController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    public function store(SaveContactAssignmentRequest $request,
+        SaveContactAssignment $action): RedirectResponse
     {
-        ContactAssignment::query()->create($this->validatedData($request));
+        $action->execute($request->user(),null,$request->validated());
 
         return back()->with('success', 'Asignacion creada correctamente.');
     }
 
-    public function update(Request $request, ContactAssignment $assignment): RedirectResponse
+    public function update(SaveContactAssignmentRequest $request, ContactAssignment $assignment,
+        SaveContactAssignment $action): RedirectResponse
     {
-        $assignment->fill($this->validatedData($request))->save();
+        $action->execute($request->user(),$assignment,$request->validated());
 
         return back()->with('success', 'Asignacion actualizada correctamente.');
     }
 
     public function destroy(ContactAssignment $assignment): RedirectResponse
     {
+        $this->authorizeDestination(request(), ['chapter_id' => $assignment->chapter_id]);
         $assignment->delete();
 
         return back()->with('success', 'Asignacion eliminada correctamente.');
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function validatedData(Request $request): array
+    private function authorizeDestination(Request $request, array $data): void
     {
-        $validator = Validator::make($request->all(), [
-            'contact_person_id' => ['required', 'integer', Rule::exists('contact_people', 'id')],
-            'chapter_id' => ['nullable', 'integer', Rule::exists('chapters', 'id')],
-            'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')],
-            'role' => ['required', 'string', 'max:80'],
-            'is_billing_contact' => ['required', 'boolean'],
-            'is_email_recipient' => ['required', 'boolean'],
-            'is_active' => ['required', 'boolean'],
-        ]);
-
-        $validator->after(function ($validator) use ($request) {
-            if (!$request->filled('chapter_id') && !$request->filled('team_id')) {
-                $validator->errors()->add('chapter_id', 'Selecciona un capitulo o un equipo.');
-            }
-
-            if (!$request->filled('team_id') || !$request->filled('chapter_id')) {
-                return;
-            }
-
-            $team = Team::query()->find($request->integer('team_id'));
-            if ($team && $team->chapter_id !== $request->integer('chapter_id')) {
-                $validator->errors()->add('team_id', 'El equipo seleccionado no pertenece al capitulo indicado.');
-            }
-        });
-
-        $data = $validator->validate();
-
-        if (!empty($data['team_id']) && empty($data['chapter_id'])) {
-            $data['chapter_id'] = Team::query()->whereKey($data['team_id'])->value('chapter_id');
+        if ($request->user()->scope_all) return;
+        abort_unless(DB::table('user_chapter_assignments')->where('user_id', $request->user()->id)
+            ->where('chapter_id', $data['chapter_id'])->exists(), 404);
+        if (isset($data['contact_person_id'])) {
+            $assignments = ContactAssignment::query()->where('contact_person_id', $data['contact_person_id']);
+            abort_unless((clone $assignments)->exists(), 404);
+            abort_if($assignments->whereNotIn('chapter_id', DB::table('user_chapter_assignments')
+                ->select('chapter_id')->where('user_id', $request->user()->id))->exists(), 404);
         }
-
-        return $data;
     }
+
 }

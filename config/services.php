@@ -28,6 +28,14 @@ return [
         'key' => env('RESEND_API_KEY', env('RESEND_KEY')),
         'endpoint' => env('RESEND_ENDPOINT', 'https://api.resend.com/emails'),
         'timeout' => env('RESEND_TIMEOUT', 30),
+        'idempotency_window_seconds' => env('RESEND_IDEMPOTENCY_WINDOW_SECONDS', 0),
+    ],
+
+    'backup' => [
+        'encryption_key' => env('FIEA_BACKUP_ENCRYPTION_KEY'),
+        'key_version' => env('FIEA_BACKUP_KEY_VERSION', 'v1'),
+        'mysqldump_binary' => env('MYSQLDUMP_BINARY', 'mysqldump'),
+        'snapshot_backend' => env('FIEA_BACKUP_SNAPSHOT_BACKEND', 'auto'),
     ],
 
     'transactional_mail' => [

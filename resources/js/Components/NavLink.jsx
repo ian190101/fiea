@@ -9,11 +9,12 @@ export default function NavLink({
     return (
         <Link
             {...props}
+            aria-current={active ? 'page' : undefined}
             className={
-                'inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none ' +
+                'inline-flex min-h-11 items-center border-b-2 px-2 text-sm font-medium text-app-text transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary ' +
                 (active
-                    ? 'border-indigo-400 text-gray-900 focus:border-indigo-700'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 focus:border-gray-300 focus:text-gray-700') +
+                    ? 'border-brand-primary'
+                    : 'border-transparent hover:border-brand-primary/50') +
                 className
             }
         >

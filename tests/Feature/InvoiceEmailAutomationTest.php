@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\SendInvoiceEmailJob;
 use App\Models\Chapter;
+use App\Models\BillingCase;
 use App\Models\ChapterType;
 use App\Models\ContactPerson;
 use App\Models\Country;
@@ -11,6 +12,7 @@ use App\Models\EmailLog;
 use App\Models\Invoice;
 use App\Models\InvoiceRecipient;
 use App\Models\Project;
+use App\Models\StorageFile;
 use App\Models\Team;
 use App\Models\TripPhase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,6 +24,12 @@ use Tests\TestCase;
 class InvoiceEmailAutomationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config()->set('services.resend.idempotency_window_seconds', 3600);
+    }
 
     public function test_command_prepares_automated_email_for_approved_invoice(): void
     {
@@ -67,11 +75,13 @@ class InvoiceEmailAutomationTest extends TestCase
             'status' => 'pending',
             'source' => 'automation',
         ]);
+        $this->freezeDelivery($emailLog, $invoice);
 
         $this->artisan('fiea:email-automation --send-pending')
             ->assertSuccessful();
 
-        Queue::assertPushed(SendInvoiceEmailJob::class);
+        Queue::assertNotPushed(SendInvoiceEmailJob::class);
+        $this->assertDatabaseHas('outbox_events', ['dedup_key' => 'invoice-email:'.$emailLog->delivery_key]);
 
         $this->assertSame('queued', $emailLog->refresh()->status);
         $this->assertNull($emailLog->sent_at);
@@ -100,11 +110,13 @@ class InvoiceEmailAutomationTest extends TestCase
             'next_retry_at' => now()->subMinute(),
             'error_message' => 'Temporary failure.',
         ]);
+        $this->freezeDelivery($emailLog, $invoice);
 
         $this->artisan('fiea:email-automation --retry-failed')
             ->assertSuccessful();
 
-        Queue::assertPushed(SendInvoiceEmailJob::class);
+        Queue::assertNotPushed(SendInvoiceEmailJob::class);
+        $this->assertDatabaseHas('outbox_events', ['dedup_key' => 'invoice-email:'.$emailLog->delivery_key]);
 
         $this->assertSame('queued', $emailLog->refresh()->status);
         $this->assertNull($emailLog->next_retry_at);
@@ -157,6 +169,19 @@ class InvoiceEmailAutomationTest extends TestCase
             'status' => 'scheduled',
             'draft_pdf_file_id' => null,
         ]);
+        $case = BillingCase::query()->create([
+            'trip_phase_id' => $tripPhase->id, 'invoice_type' => 'IC',
+            'billing_mode' => 'standard', 'metadata' => ['document_date' => '2026-07-01'],
+        ]);
+        Storage::fake('local');
+        $objectKey = 'invoices/'.$tripPhase->id.'/approved.pdf';
+        Storage::disk('local')->put($objectKey, '%PDF-1.4 documento aprobado');
+        $file = StorageFile::query()->create([
+            'provider' => 'local', 'bucket' => null, 'object_key' => $objectKey,
+            'original_name' => 'approved.pdf', 'mime_type' => 'application/pdf',
+            'size_bytes' => strlen('%PDF-1.4 documento aprobado'),
+            'checksum' => hash('sha256', '%PDF-1.4 documento aprobado'), 'public_url' => null,
+        ]);
         $contact = ContactPerson::query()->create([
             'full_name' => 'Billing Contact',
             'email' => 'billing@example.com',
@@ -165,6 +190,7 @@ class InvoiceEmailAutomationTest extends TestCase
         ]);
         $invoice = Invoice::query()->create([
             'trip_phase_id' => $tripPhase->id,
+            'pdf_file_id' => $file->id,
             'contact_person_id' => $contact->id,
             'created_by_id' => null,
             'code' => 'AUTO-'.$suffix,
@@ -176,7 +202,25 @@ class InvoiceEmailAutomationTest extends TestCase
             'grand_total' => 150,
             'balance_conciliation' => 150,
         ]);
+        $invoice->forceFill(['billing_case_id' => $case->id, 'snapshot' => [
+            'type' => 'IC', 'stage' => 'initial', 'totals' => ['total' => '150.00'],
+        ]])->save();
 
         return [$invoice, $contact];
+    }
+
+    private function freezeDelivery(EmailLog $log, Invoice $invoice): void
+    {
+        $file = $invoice->pdfFile;
+        $log->forceFill([
+            'delivery_key' => (string) str()->uuid(),
+            'recipients_snapshot' => [['email' => 'billing@example.com', 'recipient_type' => 'to']],
+            'attachment_snapshot' => [
+                'storage_file_id' => $file->id, 'checksum' => $file->checksum,
+                'filename' => $file->original_name, 'mime_type' => $file->mime_type,
+            ],
+            'payload_hash' => hash('sha256', $log->subject),
+            'dispatch_deadline' => now()->addHour(),
+        ])->save();
     }
 }

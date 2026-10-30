@@ -1,4 +1,6 @@
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
 import IconButton, { SvgIcon } from '@/Components/IconButton';
+import EmptyState from '@/Components/EmptyState';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
@@ -54,11 +56,12 @@ export default function NotificationsIndex({ filters = {}, notifications = { dat
                             <p className="mt-1 text-sm text-app-muted">Invoices, correos, backups y operaciones importantes.</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <select value={status} onChange={(event) => applyFilter(event.target.value)} className="ios-field text-sm font-bold">
+                            <label htmlFor="notifications-status" className="sr-only">Filtrar notificaciones por estado</label>
+                            <LiquidSelect id="notifications-status" value={status} onChange={(event) => applyFilter(event.target.value)} className="ios-field text-sm font-bold">
                                 {statusOptions.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
-                            </select>
+                            </LiquidSelect>
                             <button type="button" className="glass-button gap-2" onClick={markAllRead}>
                                 <SvgIcon name="check" />
                                 <span>Marcar todas</span>
@@ -74,12 +77,8 @@ export default function NotificationsIndex({ filters = {}, notifications = { dat
                         ))}
 
                         {notifications.data.length === 0 && (
-                            <div className="px-5 py-14 text-center">
-                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-secondary text-white">
-                                    <SvgIcon name="check" />
-                                </div>
-                                <p className="mt-4 text-base font-black">No hay notificaciones para este filtro</p>
-                                <p className="mt-1 text-sm text-app-muted">Los eventos nuevos apareceran automaticamente en esta bandeja.</p>
+                            <div className="p-5">
+                                <EmptyState title="Sin notificaciones para este filtro" description="Los eventos nuevos aparecerán en esta bandeja." />
                             </div>
                         )}
                     </div>

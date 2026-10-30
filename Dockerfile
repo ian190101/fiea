@@ -2,11 +2,15 @@ FROM php:8.3-cli-alpine AS assets
 
 WORKDIR /app
 
-RUN apk add --no-cache git nodejs npm unzip
+RUN apk add --no-cache git nodejs npm unzip \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+    && docker-php-ext-install -j"$(nproc)" bcmath \
+    && apk del .build-deps
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY composer.json composer.lock package.json package-lock.json ./
+COPY patches ./patches
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --no-scripts --no-autoloader \
     && npm ci
 

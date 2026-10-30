@@ -1,9 +1,13 @@
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import { useOptionCollection } from '@/Utils/useOptionCollection';
 import InputLabel from '@/Components/InputLabel';
+import EmptyState from '@/Components/EmptyState';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 export default function AuditLogIndex({ auditLogs = { data: [] }, filters = {}, filterOptions = { modules: [], actions: [], users: [] }, summary = {} }) {
+    const users=useOptionCollection(filterOptions.users,'audit-users');
     const [localFilters, setLocalFilters] = useState({
         module: filters.module ?? '',
         action: filters.action ?? '',
@@ -79,7 +83,7 @@ export default function AuditLogIndex({ auditLogs = { data: [] }, filters = {}, 
                                 id="user_id"
                                 label="Usuario"
                                 value={localFilters.user_id}
-                                options={filterOptions.users.map((user) => ({ id: user.id, name: `${user.name} (@${user.username})` }))}
+                                options={users.map((user) => ({ id: user.id, name: `${user.name} (@${user.username})` }))}
                                 emptyLabel="Todos los usuarios"
                                 onChange={(value) => setLocalFilters((current) => ({ ...current, user_id: value }))}
                             />
@@ -105,6 +109,7 @@ export default function AuditLogIndex({ auditLogs = { data: [] }, filters = {}, 
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                <caption className="sr-only">Registro de auditoría de solo lectura</caption>
                                 <thead>
                                     <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                         <th className="px-5 py-4">Fecha</th>
@@ -138,8 +143,8 @@ export default function AuditLogIndex({ auditLogs = { data: [] }, filters = {}, 
                                     ))}
                                     {rows.length === 0 && (
                                         <tr>
-                                            <td colSpan="6" className="px-5 py-10 text-center text-sm font-semibold text-app-muted">
-                                                No hay eventos para estos filtros.
+                                            <td colSpan="6" className="px-5 py-10">
+                                                <EmptyState title="Sin resultados para estos filtros" description="Cambia los filtros para consultar otros eventos." />
                                             </td>
                                         </tr>
                                     )}
@@ -178,7 +183,8 @@ function SelectField({ id, label, value, options, emptyLabel, onChange }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
+                remoteKind={id==='user_id'?'audit-users':undefined}
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -188,7 +194,7 @@ function SelectField({ id, label, value, options, emptyLabel, onChange }) {
                 {options.map((option) => (
                     <option key={option.id} value={option.id}>{option.name}</option>
                 ))}
-            </select>
+            </LiquidSelect>
         </div>
     );
 }

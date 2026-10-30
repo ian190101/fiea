@@ -1,0 +1,69 @@
+{
+  "libros": [
+    {
+      "archivo": "C:\\Users\\Ian\\Downloads\\CONTROL INGRESOS INVOICES.xlsx",
+      "sha256": "984a12d3bb5613f43fbb48c2f735089a378fbb97680f2692e94854030f4c01db",
+      "hojas": [
+        "2025",
+        "2026"
+      ]
+    },
+    {
+      "archivo": "C:\\Users\\Ian\\Downloads\\DraftBudget_10July_SantaRosaCerritos_EWBMissouriST (1).xlsx",
+      "sha256": "7b38be6fc1e7beeb087ee6c2140c7428522e27d17fa3785d58826a855e5f22b7",
+      "hojas": [
+        "MASTER TEMPLATE",
+        "DRAFT BUDGET for Team",
+        "IN-COUNTRY Initial Invoice",
+        "IN-COUNTRY Final Invoice",
+        "MATERIALS Initial Invoice",
+        "MATERIALS Final Invoice"
+      ]
+    }
+  ],
+  "filas_control": {
+    "2025": 39,
+    "2026": 14
+  },
+  "casos_fila": 53,
+  "codigos_unicos": 53,
+  "identidades_por_alias": 46,
+  "identidades_presentes_en_ambas_hojas": 7,
+  "filas_con_importes_agrupados_2025": 35,
+  "grupos_con_ingreso_numerico": 16,
+  "redondeo_referencias": "Decimal ROUND_HALF_EVEN a 2 decimales, conforme al contrato monetario del sistema",
+  "formulas": {
+    "coincide": 3588,
+    "no_evaluable": 22
+  },
+  "formulas_por_libro": {
+    "control": {
+      "coincide": 178,
+      "no_evaluable": 1
+    },
+    "presupuesto": {
+      "coincide": 3410,
+      "no_evaluable": 21
+    }
+  },
+  "reglas_filas": {
+    "coincide": 107,
+    "difiere": 14,
+    "sin_datos_completos": 91
+  },
+  "errores_excel": [
+    {
+      "hoja": "2026",
+      "celda": "O42",
+      "valor": "#VALUE!",
+      "formula": "O3+O4+O5+O6+O7+O8+O9+O10+O11+O12+O13+O14+O15+O16+O17+O18+O19+O20+O21+O22+O23+O24+O25+O26+O27+O28+O29+O30+O31+O32+O33+O34+O35+O36+O37+O38+O39+O40+O41+O43"
+    }
+  ],
+  "celdas_pendientes": 15,
+  "grafo": {
+    "archivos": 93,
+    "nodos": 297,
+    "enlaces": 804,
+    "mtimes_coinciden": true
+  }
+}

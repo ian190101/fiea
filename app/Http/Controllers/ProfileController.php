@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\AuditLog;
+use App\Models\User;
+use App\Services\Security\AdministrativeContinuity;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -49,13 +54,18 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
-
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
-        }
-
-        $request->user()->save();
+        DB::transaction(function () use ($request): void {
+            $user = User::query()->lockForUpdate()->findOrFail($request->user()->id);
+            $before = $user->only(['name', 'username', 'email']);
+            $user->fill($request->validated());
+            if ($user->isDirty('email')) {
+                $user->email_verified_at = null;
+            }
+            $user->save();
+            AuditLog::query()->create(['user_id' => $user->id, 'action' => 'profile_updated', 'module' => 'profile',
+                'auditable_type' => get_class($user), 'auditable_id' => $user->id,
+                'metadata' => ['before' => $before, 'after' => $user->only(['name', 'username', 'email'])]]);
+        });
 
         return Redirect::route('profile.edit');
     }
@@ -71,9 +81,23 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
+        try {
+            DB::transaction(function () use ($user): void {
+                $continuity = app(AdministrativeContinuity::class);
+                $continuity->lock();
+                $locked = User::query()->lockForUpdate()->findOrFail($user->id);
+                $continuity->ensure($locked, false, false, []);
+                $locked->delete();
+                AuditLog::query()->create(['user_id' => null, 'action' => 'profile_deleted', 'module' => 'profile',
+                    'auditable_type' => get_class($locked), 'auditable_id' => $locked->id, 'metadata' => ['actor_id' => $locked->id]]);
+            }, 3);
+        } catch (QueryException $e) {
+            if (in_array((string) $e->getCode(), ['23000', '23503'], true)) {
+                throw ValidationException::withMessages(['password' => 'La cuenta conserva referencias y no se puede eliminar. Solicita su desactivación.']);
+            }
+            throw $e;
+        }
         Auth::logout();
-
-        $user->delete();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

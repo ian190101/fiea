@@ -1,0 +1,63 @@
+{
+  "casos": 4,
+  "conformes": 4,
+  "fallos_contrato": 0,
+  "errores_ejecucion": 0,
+  "resultados": [
+    {
+      "nombre": "Inertia real envía hoja y perfil del archivo y procesa la respuesta",
+      "observado": {
+        "hoja": "2025",
+        "perfil": "es_EC",
+        "transporte": "multipart",
+        "selector_restablecido": true
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "Inertia real aplica únicamente la fila elegida con resoluciones",
+      "observado": {
+        "import_id": 1,
+        "row_ids": [
+          1
+        ],
+        "resolutions": {
+          "1": {
+            "project_id": 1,
+            "review_version": null,
+            "reference": "BANCO-INERTIA",
+            "method": "ACH",
+            "stage": "initial",
+            "paid_on": "2026-10-20",
+            "fiea_reference": "",
+            "fiea_method": "",
+            "fiea_stage": "",
+            "fiea_paid_on": "",
+            "note": ""
+          }
+        }
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "Matriz con Inertia real guarda y actualiza los valores predeterminados",
+      "observado": {
+        "version_guardada": 3,
+        "boton_guardar_deshabilitado": true
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "Ámbito con Inertia real conserva selección, pagina y guarda",
+      "observado": {
+        "scope_all": false,
+        "project_ids": [
+          26
+        ],
+        "chapter_ids": []
+      },
+      "estado": "conforme"
+    }
+  ],
+  "limite": "React e Inertia 2.3.26 reales en Chrome temporal. Solo HTTP y respuestas de página se simulan; sin sesiones ni destinos operativos."
+}

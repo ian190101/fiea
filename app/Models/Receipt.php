@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Receipt extends Model
 {
-    protected $fillable = ['actual_expense_id', 'storage_file_id', 'receipt_number', 'issued_on', 'amount'];
+    protected $fillable = ['actual_expense_id', 'budget_line_id', 'storage_file_id', 'receipt_number', 'issued_on', 'amount'];
 
     protected function casts(): array
     {
@@ -21,5 +21,10 @@ class Receipt extends Model
     public function storageFile()
     {
         return $this->belongsTo(StorageFile::class);
+    }
+
+    public function budgetLine()
+    {
+        return $this->belongsTo(BudgetLine::class);
     }
 }

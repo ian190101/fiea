@@ -1,3 +1,11 @@
+import CursorPager from '@/Components/CursorPager';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import WorkflowGuideCard from '@/Components/WorkflowGuideCard';
+import HelpTooltip from '@/Components/HelpTooltip';
+import { financialHelp } from '@/Content/financialHelp';
+import { workflows } from '@/Content/workflows';
+import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
@@ -5,7 +13,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TableControls from '@/Components/TableControls';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useCallback, useMemo, useState } from 'react';
 
 const invoiceTypes = [
@@ -26,10 +34,13 @@ const statusOptions = [
     { id: 'void', name: 'Anulado' },
 ];
 
-export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts = [], phaseTotals = {}, settings = {} }) {
-    const { flash } = usePage().props;
+export default function InvoiceIndex({ invoices: invoicePage = [], tripPhases = [], contacts = [], phaseTotals = {}, settings = {}, summary: serverSummary = null }) {
+    const invoices = Array.isArray(invoicePage) ? invoicePage : invoicePage.data ?? [];
+    const { flash, auth } = usePage().props;
     const [phaseFilter, setPhaseFilter] = useState(tripPhases[0]?.id ?? '');
-    const [editingInvoice, setEditingInvoice] = useState(null);
+    const [pendingAction, setPendingAction] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [voidReason, setVoidReason] = useState('');
 
     const form = useForm({
         trip_phase_id: phaseFilter,
@@ -38,10 +49,6 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
         stage: 'initial',
     });
 
-    const editForm = useForm({
-        contact_person_id: '',
-        status: 'draft',
-    });
 
     const selectedTotals = phaseTotals[String(form.data.trip_phase_id)] ?? emptyTotals();
 
@@ -64,7 +71,9 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
     ].filter(Boolean).join(' '), []);
     const table = useLocalTable(visibleInvoices, searchableInvoiceText, 10);
 
-    const summary = useMemo(() => summarize(visibleInvoices), [visibleInvoices]);
+    const summary = serverSummary && String(serverSummary.trip_phase_id ?? '') === String(phaseFilter)
+        ? serverSummary : { grandTotal: null, totalDr: null, totalWodr: null };
+    const lockedVisible = visibleInvoices.filter((invoice) => invoice.locked_at).length;
 
     const submit = (event) => {
         event.preventDefault();
@@ -75,42 +84,16 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
         });
     };
 
-    const startEdit = (invoice) => {
-        setEditingInvoice(invoice);
-        editForm.clearErrors();
-        editForm.setData({
-            contact_person_id: invoice.contact_person_id ?? '',
-            status: invoice.status,
-        });
-    };
-
-    const updateInvoice = (event) => {
-        event.preventDefault();
-
-        if (!editingInvoice) {
-            return;
-        }
-
-        editForm.patch(route('invoices.update', editingInvoice.id), {
+    const confirmAction = () => {
+        if (!pendingAction || busy) return;
+        if (pendingAction.type === 'void' && !voidReason.trim()) return;
+        setBusy(true);
+        const routeName = pendingAction.type === 'void' ? 'invoices.void' : pendingAction.type === 'refresh' ? 'invoices.refresh' : 'invoices.approve';
+        const url = route(routeName, pendingAction.invoice.id);
+        router.post(url, { version: pendingAction.invoice.version, ...(pendingAction.type === 'void' ? { reason: voidReason.trim() } : {}) }, {
             preserveScroll: true,
-            onSuccess: () => setEditingInvoice(null),
+            onFinish: () => { setBusy(false); setPendingAction(null); setVoidReason(''); },
         });
-    };
-
-    const approve = (invoice) => {
-        router.post(route('invoices.approve', invoice.id), {}, { preserveScroll: true });
-    };
-
-    const generatePdf = (invoice) => {
-        router.post(route('invoices.pdf.store', invoice.id), {}, { preserveScroll: true });
-    };
-
-    const destroy = (invoice) => {
-        if (!window.confirm(`Eliminar invoice "${invoice.code}"?`)) {
-            return;
-        }
-
-        router.delete(route('invoices.destroy', invoice.id), { preserveScroll: true });
     };
 
     const changePhaseFilter = (value) => {
@@ -131,12 +114,15 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
+                <CursorPager page={invoicePage} label="invoices" />
+
+                <WorkflowGuideCard guideKey="invoices" userId={auth.user.id} title="De Initial a Final" steps={workflows.invoices} />
 
                 <div className="grid gap-4 md:grid-cols-4">
                     <MetricCard label="Total general" value={formatMoney(summary.grandTotal)} />
                     <MetricCard label="DR" value={formatMoney(summary.totalDr)} />
                     <MetricCard label="WODR" value={formatMoney(summary.totalWodr)} />
-                    <MetricCard label="Bloqueados" value={summary.lockedCount} />
+                    <MetricCard label="Bloqueados visibles" value={lockedVisible} />
                 </div>
 
                 <section className="grid gap-6 xl:grid-cols-[410px_1fr]">
@@ -145,7 +131,7 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
                             <div>
                                 <h2 className="text-xl font-black">Nuevo invoice</h2>
                                 <p className="mt-2 text-sm leading-6 text-app-muted">
-                                    IC y MAT se generan como invoices separados. Los totales salen de gastos reales.
+                                    Initial utiliza el presupuesto estimado aprobado; Final utiliza gastos reales de su etapa.
                                 </p>
                             </div>
 
@@ -189,18 +175,14 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
                                 />
 
                                 <div className="grid gap-3 rounded-2xl bg-white/30 p-4 text-sm dark:bg-white/10">
-                                    <AmountRow label="DR" value={selectedTotals.total_dr} />
-                                    <AmountRow label="WODR" value={selectedTotals.total_wodr} />
+                                    <AmountRow label="DR" value={selectedTotals.total_dr} helpKey="initialDr" />
+                                    <AmountRow label="WODR" value={selectedTotals.total_wodr} helpKey="initialWodr" />
                                     <AmountRow label="Total general" value={selectedTotals.grand_total} strong />
-                                    <AmountRow label="Credito equipo" value={selectedTotals.team_credit} />
-                                    <AmountRow label="Balance conciliacion" value={selectedTotals.balance_conciliation} strong />
+                                    <AmountRow label="Crédito equipo" value={selectedTotals.team_credit} helpKey="credit" />
+                                    <AmountRow label="Balance documental" value={selectedTotals.balance_conciliation} strong helpKey="balanceDue" />
                                 </div>
 
-                                {form.data.stage === 'final' && settings.lockFinalInvoiceByDefault && (
-                                    <div className="rounded-2xl border border-amber-400/30 bg-amber-400/15 px-4 py-3 text-sm font-bold text-app-text">
-                                        El final invoice se bloqueara al crearlo por configuracion del sistema.
-                                    </div>
-                                )}
+                                <p className="text-sm">Revisa el borrador antes de aprobar. La aprobación protege el documento y sus importes.</p>
                             </div>
 
                             <div className="mt-6">
@@ -210,39 +192,6 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
                             </div>
                         </form>
 
-                        {editingInvoice && (
-                            <form onSubmit={updateInvoice} className="glass-panel rounded-[2rem] p-5">
-                                <h2 className="text-xl font-black">Editar invoice</h2>
-                                <p className="mt-1 text-sm font-semibold text-app-muted">{editingInvoice.code}</p>
-
-                                <div className="mt-5 space-y-4">
-                                    <SelectField
-                                        id="edit_contact_person_id"
-                                        label="Contacto"
-                                        value={editForm.data.contact_person_id}
-                                        options={contacts.map((contact) => ({ id: contact.id, name: contactLabel(contact) }))}
-                                        error={editForm.errors.contact_person_id}
-                                        emptyLabel="Sin contacto"
-                                        onChange={(value) => editForm.setData('contact_person_id', value)}
-                                    />
-                                    <SelectField
-                                        id="edit_status"
-                                        label="Estado"
-                                        value={editForm.data.status}
-                                        options={statusOptions}
-                                        error={editForm.errors.status}
-                                        onChange={(value) => editForm.setData('status', value)}
-                                    />
-                                </div>
-
-                                <div className="mt-6 flex flex-wrap gap-3">
-                                    <PrimaryButton disabled={editForm.processing}>Guardar</PrimaryButton>
-                                    <button type="button" className="glass-button" onClick={() => setEditingInvoice(null)}>
-                                        Cancelar
-                                    </button>
-                                </div>
-                            </form>
-                        )}
                     </div>
 
                     <div className="glass-panel overflow-hidden rounded-[2rem]">
@@ -252,7 +201,7 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
                                 <h2 className="text-xl font-black">Invoices registrados</h2>
                                 <p className="text-sm text-app-muted">{visibleInvoices.length} de {invoices.length} invoices</p>
                             </div>
-                            <select
+                            <LiquidSelect
                                 value={phaseFilter}
                                 onChange={(event) => changePhaseFilter(event.target.value)}
                                 className="rounded-xl border-app-border bg-white/70 text-sm font-bold text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
@@ -261,7 +210,7 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
                                 {tripPhases.map((phase) => (
                                     <option key={phase.id} value={phase.id}>{phaseLabel(phase)}</option>
                                 ))}
-                            </select>
+                            </LiquidSelect>
                             </div>
                             <TableControls
                                 query={table.query}
@@ -329,13 +278,13 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
                                                         />
                                                     )}
                                                     {!invoice.locked_at && (
-                                                        <IconButton icon="edit" label="Editar invoice" type="button" onClick={() => startEdit(invoice)} />
+                                                        <IconButton icon="edit" label="Actualizar borrador" type="button" onClick={() => setPendingAction({ type: 'refresh', invoice })} />
                                                     )}
                                                     {invoice.status === 'draft' && (
-                                                        <IconButton icon="check" label="Aprobar invoice" type="button" onClick={() => approve(invoice)} />
+                                                        <IconButton icon="check" label="Aprobar invoice" type="button" onClick={() => setPendingAction({ type: 'approve', invoice })} />
                                                     )}
                                                     {!invoice.locked_at && (
-                                                        <IconButton icon="trash" label="Eliminar invoice" type="button" variant="danger" onClick={() => destroy(invoice)} />
+                                                        <IconButton icon="trash" label="Anular invoice" type="button" variant="danger" onClick={() => setPendingAction({ type: 'void', invoice })} />
                                                     )}
                                                 </div>
                                             </td>
@@ -354,6 +303,13 @@ export default function InvoiceIndex({ invoices = [], tripPhases = [], contacts 
                     </div>
                 </section>
             </div>
+            <FinancialActionSheet open={Boolean(pendingAction)} busy={busy} title={pendingAction?.type === 'void' ? 'Anular invoice' : pendingAction?.type === 'refresh' ? 'Actualizar borrador' : 'Aprobar invoice'}
+                description={`${pendingAction?.invoice.code ?? ''} · ${formatMoney(pendingAction?.invoice.grand_total)} · ${pendingAction?.invoice.status ?? ''} → ${pendingAction?.type === 'void' ? 'void' : pendingAction?.type === 'refresh' ? 'draft actualizado' : 'approved'}`}
+                confirmLabel={pendingAction?.type === 'void' ? 'Anular' : pendingAction?.type === 'refresh' ? 'Actualizar' : 'Aprobar'}
+                confirmDisabled={pendingAction?.type === 'void' && !voidReason.trim()}
+                onCancel={() => setPendingAction(null)} onConfirm={confirmAction}>
+                {pendingAction?.type === 'void' && <div className="mt-4"><InputLabel htmlFor="void-reason">Motivo de anulación</InputLabel><input id="void-reason" className="ios-field mt-2 w-full" value={voidReason} onChange={(event) => setVoidReason(event.target.value)} maxLength={500} required /></div>}
+            </FinancialActionSheet>
         </AuthenticatedLayout>
     );
 }
@@ -394,7 +350,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -404,17 +360,17 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
                 {options.map((option) => (
                     <option key={option.id} value={option.id}>{option.name}</option>
                 ))}
-            </select>
+            </LiquidSelect>
             <InputError message={error} className="mt-2" />
         </div>
     );
 }
 
-function AmountRow({ label, value, strong = false }) {
+function AmountRow({ label, value, strong = false, helpKey = null }) {
     return (
         <div className={`flex items-center justify-between gap-4 ${strong ? 'font-black' : 'font-bold text-app-muted'}`}>
-            <span>{label}</span>
-            <span>{formatMoney(value)}</span>
+            <span>{label}{helpKey && <HelpTooltip {...financialHelp[helpKey]} />}</span>
+            <span className="money">{formatMoney(value)}</span>
         </div>
     );
 }
@@ -430,22 +386,14 @@ function StatusBadge({ status, locked }) {
     );
 }
 
-function summarize(invoices) {
-    return invoices.reduce((carry, invoice) => ({
-        totalDr: carry.totalDr + Number(invoice.total_dr ?? 0),
-        totalWodr: carry.totalWodr + Number(invoice.total_wodr ?? 0),
-        grandTotal: carry.grandTotal + Number(invoice.grand_total ?? 0),
-        lockedCount: carry.lockedCount + (invoice.locked_at ? 1 : 0),
-    }), { totalDr: 0, totalWodr: 0, grandTotal: 0, lockedCount: 0 });
-}
 
 function emptyTotals() {
     return {
-        total_dr: 0,
-        total_wodr: 0,
-        grand_total: 0,
-        team_credit: 0,
-        balance_conciliation: 0,
+        total_dr: null,
+        total_wodr: null,
+        grand_total: null,
+        team_credit: null,
+        balance_conciliation: null,
     };
 }
 
@@ -463,11 +411,4 @@ function stageLabel(stage) {
 
 function statusLabel(status) {
     return statusOptions.find((option) => option.id === status)?.name ?? status;
-}
-
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
 }

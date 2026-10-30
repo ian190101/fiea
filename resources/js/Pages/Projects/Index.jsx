@@ -1,18 +1,28 @@
+import { useOptionCollection } from '@/Utils/useOptionCollection';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TableControls from '@/Components/TableControls';
 import TextInput from '@/Components/TextInput';
+import EmptyState from '@/Components/EmptyState';
+import CursorPager from '@/Components/CursorPager';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { useCallback, useMemo, useState } from 'react';
 
-export default function ProjectIndex({ projects = [], countries = [], communities = [] }) {
+export default function ProjectIndex({ projects: projectPage = [], countries: initialcountries = [], communities: initialcommunities = [] }) {
+    const countries = useOptionCollection(initialcountries, 'countries');
+    const communities = useOptionCollection(initialcommunities, 'communities');
+    const projects = Array.isArray(projectPage) ? projectPage : (projectPage?.data ?? []);
     const { flash } = usePage().props;
     const [editingProject, setEditingProject] = useState(null);
     const [countryFilter, setCountryFilter] = useState('');
+    const [projectToDelete, setProjectToDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     const form = useForm({
         country_id: countries[0]?.id ?? '',
@@ -93,18 +103,17 @@ export default function ProjectIndex({ projects = [], countries = [], communitie
         });
     };
 
-    const destroy = (project) => {
-        if (!window.confirm(`Eliminar "${project.code} - ${project.name}"?`)) {
-            return;
-        }
-
-        router.delete(route('projects.destroy', project.id), {
+    const destroy = () => {
+        if (!projectToDelete) return;
+        setDeleting(true);
+        router.delete(route('projects.destroy', projectToDelete.id), {
             preserveScroll: true,
             onSuccess: () => {
-                if (editingProject?.id === project.id) {
+                if (editingProject?.id === projectToDelete.id) {
                     resetForm();
                 }
             },
+            onFinish: () => { setDeleting(false); setProjectToDelete(null); },
         });
     };
 
@@ -122,6 +131,9 @@ export default function ProjectIndex({ projects = [], countries = [], communitie
             }
         >
             <Head title="Proyectos" />
+            <FinancialActionSheet open={Boolean(projectToDelete)} title="Eliminar proyecto"
+                description={projectToDelete ? `Se eliminará ${projectToDelete.code} - ${projectToDelete.name}. Esta acción no se puede deshacer.` : ''}
+                confirmLabel="Eliminar proyecto" busy={deleting} onCancel={() => setProjectToDelete(null)} onConfirm={destroy} />
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
@@ -154,6 +166,7 @@ export default function ProjectIndex({ projects = [], countries = [], communitie
 
                             <SelectField
                                 id="community_id"
+                                remoteParams={{country_id:form.data.country_id || undefined}}
                                 label="Comunidad"
                                 value={form.data.community_id}
                                 options={availableCommunities}
@@ -225,7 +238,9 @@ export default function ProjectIndex({ projects = [], countries = [], communitie
                                     <h2 className="text-xl font-black">Proyectos registrados</h2>
                                     <p className="text-sm text-app-muted">{visibleProjects.length} de {projects.length} proyectos</p>
                                 </div>
-                                <select
+                                <LiquidSelect
+                                    id="project-country-filter"
+                                    aria-label="Filtrar proyectos por país"
                                     value={countryFilter}
                                     onChange={(event) => setCountryFilter(event.target.value)}
                                     className="ios-field text-sm font-bold"
@@ -236,7 +251,7 @@ export default function ProjectIndex({ projects = [], countries = [], communitie
                                             {country.name}
                                         </option>
                                     ))}
-                                </select>
+                                </LiquidSelect>
                             </div>
                             <TableControls
                                 query={table.query}
@@ -254,6 +269,7 @@ export default function ProjectIndex({ projects = [], countries = [], communitie
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                <caption className="sr-only">Proyectos registrados y acciones disponibles</caption>
                                 <thead>
                                     <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                         <th className="px-5 py-4">Codigo</th>
@@ -283,21 +299,24 @@ export default function ProjectIndex({ projects = [], countries = [], communitie
                                             <td className="px-5 py-4">
                                                 <div className="flex justify-end gap-2">
                                                     <IconButton icon="edit" label="Editar proyecto" type="button" onClick={() => edit(project)} />
-                                                    <IconButton icon="trash" label="Eliminar proyecto" type="button" variant="danger" onClick={() => destroy(project)} />
+                                                    <IconButton icon="trash" label="Eliminar proyecto" type="button" variant="danger" onClick={() => setProjectToDelete(project)} />
                                                 </div>
                                             </td>
                                         </tr>
                                     ))}
                                     {table.filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan="6" className="px-5 py-10 text-center text-sm font-semibold text-app-muted">
-                                                Aun no hay proyectos para este filtro.
+                                            <td colSpan="6" className="px-5 py-10">
+                                                <EmptyState title={projects.length ? 'Sin resultados para estos filtros' : 'Aún no hay proyectos'}
+                                                    description={projects.length ? 'Prueba con otro país o término de búsqueda.' : 'Crea un proyecto para comenzar.'}
+                                                    action={projects.length ? <button type="button" className="glass-button" onClick={() => { setCountryFilter(''); table.updateQuery(''); }}>Limpiar filtros</button> : null} />
                                             </td>
                                         </tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
+                        <div className="px-5 pb-5"><CursorPager page={projectPage} label="proyectos" /></div>
                     </div>
                 </section>
             </div>
@@ -315,12 +334,12 @@ function FlashMessages({ flash }) {
     return (
         <div className="space-y-3">
             {flash.success && (
-                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/15 px-4 py-3 text-sm font-bold text-app-text">
+                <div role="status" className="rounded-2xl border border-emerald-400/30 bg-emerald-400/15 px-4 py-3 text-sm font-bold text-app-text">
                     {flash.success}
                 </div>
             )}
             {projectError && (
-                <div className="rounded-2xl border border-red-400/30 bg-red-400/15 px-4 py-3 text-sm font-bold text-app-text">
+                <div role="alert" className="rounded-2xl border border-red-400/30 bg-red-400/15 px-4 py-3 text-sm font-bold text-app-text">
                     {projectError}
                 </div>
             )}
@@ -328,14 +347,17 @@ function FlashMessages({ flash }) {
     );
 }
 
-function SelectField({ id, label, value, options, error, onChange, emptyLabel = 'Seleccionar' }) {
+function SelectField({ id, label, value, options, error, onChange, remoteParams, emptyLabel = 'Seleccionar' }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
+                remoteParams={remoteParams}
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
                 className="mt-1 block w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
             >
                 <option value="">{emptyLabel}</option>
@@ -344,8 +366,8 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
                         {option.name}
                     </option>
                 ))}
-            </select>
-            <InputError message={error} className="mt-2" />
+            </LiquidSelect>
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }
@@ -359,9 +381,11 @@ function TextField({ id, label, value, error, onChange, type = 'text' }) {
                 type={type}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
                 className="mt-1 block w-full"
             />
-            <InputError message={error} className="mt-2" />
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }
@@ -374,9 +398,11 @@ function TextareaField({ id, label, value, error, onChange }) {
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
                 className="mt-1 block min-h-24 w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm placeholder:text-app-muted/70 focus:border-brand-primary focus:ring-brand-primary dark:bg-white/10"
             />
-            <InputError message={error} className="mt-2" />
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }

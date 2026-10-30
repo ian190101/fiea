@@ -1,3 +1,11 @@
+import { useOptionCollection } from '@/Utils/useOptionCollection';
+import CursorPager from '@/Components/CursorPager';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
+import WorkflowGuideCard from '@/Components/WorkflowGuideCard';
+import { workflows } from '@/Content/workflows';
+import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
@@ -9,19 +17,25 @@ import { useLocalTable } from '@/Utils/useLocalTable';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useCallback, useMemo, useState } from 'react';
 
-export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhases = [], expenseCategories = [] }) {
-    const { flash } = usePage().props;
+export default function EstimatedExpenseIndex({ estimatedExpenses: expensePage = [], tripPhases: initialtripPhases = [], expenseCategories = [], summary: serverSummary = null }) {
+    const tripPhases = useOptionCollection(initialtripPhases, 'trip-phases');
+    const estimatedExpenses = Array.isArray(expensePage) ? expensePage : expensePage.data ?? [];
+    const { flash, auth } = usePage().props;
     const [editingExpense, setEditingExpense] = useState(null);
     const [phaseFilter, setPhaseFilter] = useState(tripPhases[0]?.id ?? '');
 
     const form = useForm({
         trip_phase_id: phaseFilter,
+        version: tripPhases[0]?.version ?? 1,
         expense_category_id: expenseCategories[0]?.id ?? '',
         description: '',
         unit: '',
-        initial_unit_cost: 0,
-        initial_quantity: 1,
+        initial_unit_cost: '0.0000',
+        initial_quantity: '1.0000',
     });
+    const guard = useUnsavedChangesGuard(form.isDirty);
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
 
     const selectedCategory = useMemo(
         () => expenseCategories.find((category) => String(category.id) === String(form.data.expense_category_id)) ?? null,
@@ -49,8 +63,8 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
     ].filter(Boolean).join(' '), []);
     const table = useLocalTable(visibleExpenses, searchableExpenseText, 10);
 
-    const summary = useMemo(() => summarizeExpenses(visibleExpenses), [visibleExpenses]);
-    const lineTotal = Number(form.data.initial_unit_cost || 0) * Number(form.data.initial_quantity || 0);
+    const summary = serverSummary && String(serverSummary.trip_phase_id ?? '') === String(phaseFilter)
+        ? serverSummary : { dr: null, wodr: null, total: null };
 
     const submit = (event) => {
         event.preventDefault();
@@ -74,48 +88,51 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
         form.clearErrors();
         form.setData({
             trip_phase_id: expense.trip_phase_id,
+            version: expense.trip_phase?.version ?? tripPhases.find((phase) => String(phase.id) === String(expense.trip_phase_id))?.version ?? 1,
             expense_category_id: expense.expense_category_id,
             description: expense.description ?? '',
             unit: expense.unit ?? '',
-            initial_unit_cost: expense.initial_unit_cost ?? 0,
-            initial_quantity: expense.initial_quantity ?? 1,
+            initial_unit_cost: expense.initial_unit_cost ?? '0.0000',
+            initial_quantity: expense.initial_quantity ?? '1.0000',
         });
     };
 
     const resetForm = () => {
         setEditingExpense(null);
         form.clearErrors();
-        form.setData({
+        const next = {
             trip_phase_id: phaseFilter,
+            version: tripPhases.find((phase) => String(phase.id) === String(phaseFilter))?.version ?? 1,
             expense_category_id: expenseCategories[0]?.id ?? '',
             description: '',
             unit: '',
-            initial_unit_cost: 0,
-            initial_quantity: 1,
-        });
+            initial_unit_cost: '0.0000',
+            initial_quantity: '1.0000',
+        };
+        form.setData(next);
+        form.setDefaults(next);
     };
 
-    const destroy = (expense) => {
-        if (!window.confirm(`Eliminar "${expense.description}"?`)) {
-            return;
-        }
-
-        router.delete(route('estimated-expenses.destroy', expense.id), {
+    const destroy = (expense) => guard.request(() => setPendingDelete(expense));
+    const confirmDelete = () => {
+        if (!pendingDelete || deleteBusy) return;
+        setDeleteBusy(true);
+        router.delete(route('estimated-expenses.destroy', pendingDelete.id), {
+            data: { version: pendingDelete.trip_phase?.version ?? tripPhases.find((phase) => String(phase.id) === String(pendingDelete.trip_phase_id))?.version ?? 1 },
             preserveScroll: true,
             onSuccess: () => {
-                if (editingExpense?.id === expense.id) {
-                    resetForm();
-                }
+                if (editingExpense?.id === pendingDelete.id) resetForm();
             },
+            onFinish: () => { setDeleteBusy(false); setPendingDelete(null); },
         });
     };
 
-    const changePhaseFilter = (value) => {
+    const changePhaseFilter = (value) => guard.request(() => {
         setPhaseFilter(value);
         if (!editingExpense) {
-            form.setData('trip_phase_id', value);
+            form.setData({ ...form.data, trip_phase_id: value, version: tripPhases.find((phase) => String(phase.id) === String(value))?.version ?? 1 });
         }
-    };
+    });
 
     return (
         <AuthenticatedLayout
@@ -134,12 +151,17 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
+                <CursorPager page={expensePage} label="gastos estimados" />
+
+                <WorkflowGuideCard guideKey="budget" userId={auth.user.id} title="Del presupuesto al cierre" steps={workflows.budget} />
+                {phaseFilter && <Link href={`/trip-phases/${phaseFilter}/budget?view=draft&invoice_type=IC&stage=initial`} className="glass-button px-4">Abrir matriz diaria</Link>}
+                <p className="text-sm text-app-muted">Datos anteriores pendientes de migración: las líneas de esta lista se conservan para consulta.</p>
 
                 <div className="grid gap-4 md:grid-cols-4">
                     <MetricCard label="DR total" value={formatMoney(summary.dr)} />
                     <MetricCard label="WODR total" value={formatMoney(summary.wodr)} />
                     <MetricCard label="Grand total" value={formatMoney(summary.total)} />
-                    <MetricCard label="Lineas" value={summary.count} />
+                    <MetricCard label="Líneas visibles" value={visibleExpenses.length} />
                 </div>
 
                 <section className="grid gap-6 xl:grid-cols-[400px_1fr]">
@@ -160,7 +182,7 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
                                 value={form.data.trip_phase_id}
                                 options={tripPhases.map((phase) => ({ id: phase.id, name: phaseLabel(phase) }))}
                                 error={form.errors.trip_phase_id}
-                                onChange={(value) => form.setData('trip_phase_id', value)}
+                                onChange={(value) => form.setData({ ...form.data, trip_phase_id: value, version: tripPhases.find((phase) => String(phase.id) === String(value))?.version ?? 1 })}
                             />
 
                             <SelectField
@@ -219,7 +241,7 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
                             </div>
 
                             <div className="rounded-2xl bg-white/30 px-4 py-3 text-sm font-black text-app-text dark:bg-white/10">
-                                Total calculado: {formatMoney(lineTotal)}
+                                Total calculado por el servidor al guardar
                             </div>
                         </div>
 
@@ -243,7 +265,7 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
                                     <p className="text-sm text-app-muted">{visibleExpenses.length} de {estimatedExpenses.length} lineas</p>
                                 </div>
                                 <div className="flex flex-col gap-2 md:items-end">
-                                    <select
+                                    <LiquidSelect
                                         value={phaseFilter}
                                         onChange={(event) => changePhaseFilter(event.target.value)}
                                         className="ios-field text-sm font-bold"
@@ -254,7 +276,7 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
                                                 {phaseLabel(phase)}
                                             </option>
                                         ))}
-                                    </select>
+                                    </LiquidSelect>
                                     {selectedPhase && (
                                         <div className="flex flex-wrap justify-end gap-2">
                                             <IconButton
@@ -319,8 +341,8 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
                                                 <div>{expense.trip_phase?.phase ?? '-'}</div>
                                                 <div className="text-xs text-app-muted">{expense.trip_phase?.project?.code ?? '-'}</div>
                                             </td>
-                                            <td className="px-5 py-4 text-right">{formatMoney(expense.initial_unit_cost)}</td>
-                                            <td className="px-5 py-4 text-right">{formatNumber(expense.initial_quantity)}</td>
+                                            <td className="money px-5 py-4">{expense.initial_unit_cost ?? 'Pendiente'}</td>
+                                            <td className="px-5 py-4 text-right">{expense.initial_quantity ?? 'Pendiente'}</td>
                                             <td className="px-5 py-4 text-right font-black">{formatMoney(expense.estimated_total)}</td>
                                             <td className="px-5 py-4">
                                                 <div className="flex justify-end gap-2">
@@ -343,6 +365,10 @@ export default function EstimatedExpenseIndex({ estimatedExpenses = [], tripPhas
                     </div>
                 </section>
             </div>
+            <FinancialActionSheet open={Boolean(pendingDelete)} busy={deleteBusy} title="Eliminar registro"
+                description={pendingDelete ? `Se eliminará «${pendingDelete.description}». Confirma solo si corresponde a un borrador.` : ''}
+                confirmLabel="Eliminar" onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
+            <FinancialActionSheet {...guard.dialogProps} />
         </AuthenticatedLayout>
     );
 }
@@ -383,7 +409,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -395,7 +421,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
                         {option.name}
                     </option>
                 ))}
-            </select>
+            </LiquidSelect>
             <InputError message={error} className="mt-2" />
         </div>
     );
@@ -418,36 +444,7 @@ function TextField({ id, label, value, error, onChange, type = 'text', step }) {
     );
 }
 
-function summarizeExpenses(expenses) {
-    return expenses.reduce((summary, expense) => {
-        const total = Number(expense.estimated_total ?? 0);
-
-        if (expense.fund_type === 'DR') {
-            summary.dr += total;
-        } else {
-            summary.wodr += total;
-        }
-
-        summary.total += total;
-        summary.count += 1;
-
-        return summary;
-    }, { dr: 0, wodr: 0, total: 0, count: 0 });
-}
 
 function phaseLabel(phase) {
     return `${phase.project?.code ?? 'Sin proyecto'} - ${phase.phase} (${phase.team?.name ?? 'Sin equipo'})`;
-}
-
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
-}
-
-function formatNumber(value) {
-    return new Intl.NumberFormat('en-US', {
-        maximumFractionDigits: 2,
-    }).format(Number(value ?? 0));
 }

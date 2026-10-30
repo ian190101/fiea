@@ -1,12 +1,18 @@
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
 import InputError from '@/Components/InputError';
+import LiquidToggle from '@/Components/Glass/LiquidToggle';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TableControls from '@/Components/TableControls';
 import TextInput from '@/Components/TextInput';
+import EmptyState from '@/Components/EmptyState';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage, useRemember } from '@inertiajs/react';
+import UserScopeEditor from '@/Components/UserScopeEditor';
 import { useCallback, useMemo, useState } from 'react';
 
 const themeOptions = [
@@ -15,14 +21,18 @@ const themeOptions = [
     { id: 'dark', name: 'Oscuro' },
 ];
 
-export default function SuperadminIndex({ users = [], roles = [], permissions = {} }) {
+export default function SuperadminIndex({ users = [], roles = [], permissions = {}, canManageScope = false }) {
     const { flash } = usePage().props;
+    const userRows = Array.isArray(users) ? users : (users?.data ?? []);
+    const roleRows = Array.isArray(roles) ? roles : [];
     const [editingUser, setEditingUser] = useState(null);
     const [editingRole, setEditingRole] = useState(null);
+    const [editingScope, setEditingScope] = useRemember(null, `ScopeEditor:${usePage().props.auth.user.id}`);
 
     const userForm = useForm(defaultUserForm());
     const roleForm = useForm(defaultRoleForm());
-    const permissionModules = useMemo(() => Object.entries(permissions), [permissions]);
+    const permissionModules = useMemo(() => Object.entries(permissions ?? {}), [permissions]);
+    const guard = useUnsavedChangesGuard(userForm.isDirty || roleForm.isDirty);
     const userSearchText = useCallback((user) => [
         user.name,
         user.username,
@@ -35,8 +45,8 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
         role.description,
         ...(role.permissions ?? []).map((permission) => permission.name),
     ].filter(Boolean).join(' '), []);
-    const userTable = useLocalTable(users, userSearchText, 10);
-    const roleTable = useLocalTable(roles, roleSearchText, 10);
+    const userTable = useLocalTable(userRows, userSearchText, 10);
+    const roleTable = useLocalTable(roleRows, roleSearchText, 10);
 
     const submitUser = (event) => {
         event.preventDefault();
@@ -79,7 +89,7 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
             must_change_password: Boolean(user.must_change_password),
             theme_preference: user.theme_preference ?? 'system',
             is_active: Boolean(user.is_active),
-            role_ids: user.roles.map((role) => role.id),
+            role_ids: (user.roles ?? []).map((role) => role.id),
         });
     };
 
@@ -90,7 +100,7 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
             name: role.name,
             code: role.code,
             description: role.description ?? '',
-            permission_ids: role.permissions.map((permission) => permission.id),
+            permission_ids: (role.permissions ?? []).map((permission) => permission.id),
         });
     };
 
@@ -124,18 +134,20 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
             }
         >
             <Head title="Superadmin" />
+            <FinancialActionSheet {...guard.dialogProps} />
+            {editingScope && <UserScopeEditor key={editingScope.id} user={editingScope} onClose={() => setEditingScope(null)} />}
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
 
                 <div className="grid gap-4 md:grid-cols-3">
-                    <MetricCard label="Usuarios" value={users.length} />
-                    <MetricCard label="Roles" value={roles.length} />
+                    <MetricCard label="Usuarios en esta página" value={userRows.length} />
+                    <MetricCard label="Roles" value={roleRows.length} />
                     <MetricCard label="Permisos" value={permissionModules.reduce((total, [, items]) => total + items.length, 0)} />
                 </div>
 
-                <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-                    <div className="space-y-6">
+                <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+                    <div className="min-w-0 space-y-6">
                         <form onSubmit={submitUser} className="glass-panel rounded-[2rem] p-5">
                             <h2 className="text-xl font-black">{editingUser ? 'Editar usuario' : 'Nuevo usuario'}</h2>
                             <div className="mt-5 space-y-4">
@@ -154,17 +166,20 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
                                 />
 
                                 <SwitchField label="Activo" checked={userForm.data.is_active} onChange={(value) => userForm.setData('is_active', value)} />
-                                <SwitchField label="Debe cambiar password" checked={userForm.data.must_change_password} onChange={(value) => userForm.setData('must_change_password', value)} />
+                                <SwitchField label="Debe cambiar la contraseña" checked={userForm.data.must_change_password} onChange={(value) => userForm.setData('must_change_password', value)} />
 
                                 <CheckboxGroup
                                     label="Roles"
-                                    items={roles}
+                                    items={roleRows}
                                     selectedIds={userForm.data.role_ids}
                                     onToggle={toggleUserRole}
                                 />
+                                <p role="status" className="text-sm text-app-muted">
+                                    {`Resumen: ${userForm.data.role_ids.length} roles seleccionados. Ámbito global actual: ${editingUser?.scope_all ? 'sí' : 'no'}.`}
+                                </p>
                                 <InputError message={userForm.errors.user} className="mt-2" />
                             </div>
-                            <FormActions processing={userForm.processing} editing={Boolean(editingUser)} onCancel={resetUserForm} submitLabel={editingUser ? 'Guardar usuario' : 'Crear usuario'} />
+                            <FormActions processing={userForm.processing} editing={Boolean(editingUser)} onCancel={() => guard.request(resetUserForm)} submitLabel={editingUser ? 'Guardar usuario' : 'Crear usuario'} />
                         </form>
 
                         <form onSubmit={submitRole} className="glass-panel rounded-[2rem] p-5">
@@ -197,12 +212,13 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
                                         </div>
                                     ))}
                                 </div>
+                                <p role="status" className="text-sm text-app-muted">{roleForm.data.permission_ids.length} permisos seleccionados.</p>
                             </div>
-                            <FormActions processing={roleForm.processing} editing={Boolean(editingRole)} onCancel={resetRoleForm} submitLabel={editingRole ? 'Guardar rol' : 'Crear rol'} />
+                            <FormActions processing={roleForm.processing} editing={Boolean(editingRole)} onCancel={() => guard.request(resetRoleForm)} submitLabel={editingRole ? 'Guardar rol' : 'Crear rol'} />
                         </form>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="min-w-0 space-y-6">
                         <div className="glass-panel overflow-hidden rounded-[2rem]">
                             <div className="space-y-4 border-b border-white/30 px-5 py-5 dark:border-white/10">
                                 <h2 className="text-xl font-black">Usuarios</h2>
@@ -214,13 +230,14 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
                                     pageSize={userTable.pageSize}
                                     onPageSizeChange={userTable.updatePageSize}
                                     onPageChange={userTable.setPage}
-                                    total={users.length}
+                                    total={userRows.length}
                                     filtered={userTable.filteredRows.length}
                                     placeholder="Buscar usuario"
                                 />
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                    <caption className="sr-only">Usuarios y roles asignados</caption>
                                     <thead>
                                         <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                             <th className="px-5 py-4">Usuario</th>
@@ -237,19 +254,25 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
                                                     <div className="text-xs text-app-muted">@{user.username} · {user.email ?? '-'}</div>
                                                 </td>
                                                 <td className="px-5 py-4">
-                                                    <PillList items={user.roles.map((role) => role.name)} />
+                                                    <PillList items={(user.roles ?? []).map((role) => role.name)} />
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <StatusBadge active={user.is_active} />
                                                 </td>
                                                 <td className="px-5 py-4 text-right">
                                                     <IconButton icon="edit" label="Editar usuario" type="button" onClick={() => editUser(user)} />
+                                                    {canManageScope && <button type="button" className="glass-button ml-2 px-3" onClick={() => setEditingScope(user)}>Editar ámbito</button>}
                                                 </td>
                                             </tr>
                                         ))}
+                                        {userTable.filteredRows.length === 0 && <tr><td colSpan="4" className="p-5"><EmptyState title={userRows.length ? 'Sin resultados para estos filtros' : 'Aún no hay usuarios'} description="Consulta otra página o cambia la búsqueda." /></td></tr>}
                                     </tbody>
                                 </table>
                             </div>
+                            {(users?.prev_page_url || users?.next_page_url) && <nav aria-label="Páginas de usuarios" className="flex justify-between gap-3 p-5">
+                                {users.prev_page_url ? <Link href={users.prev_page_url} className="glass-button">Anterior</Link> : <span />}
+                                {users.next_page_url && <Link href={users.next_page_url} className="glass-button">Siguiente</Link>}
+                            </nav>}
                         </div>
 
                         <div className="glass-panel overflow-hidden rounded-[2rem]">
@@ -263,13 +286,14 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
                                     pageSize={roleTable.pageSize}
                                     onPageSizeChange={roleTable.updatePageSize}
                                     onPageChange={roleTable.setPage}
-                                    total={roles.length}
+                                    total={roleRows.length}
                                     filtered={roleTable.filteredRows.length}
                                     placeholder="Buscar rol"
                                 />
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                    <caption className="sr-only">Roles y permisos asignados</caption>
                                     <thead>
                                         <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                             <th className="px-5 py-4">Rol</th>
@@ -285,13 +309,14 @@ export default function SuperadminIndex({ users = [], roles = [], permissions = 
                                                     <div className="font-black">{role.name}</div>
                                                     <div className="text-xs text-app-muted">{role.code}</div>
                                                 </td>
-                                                <td className="px-5 py-4">{role.permissions.length}</td>
+                                                <td className="px-5 py-4">{role.permissions?.length ?? 0}</td>
                                                 <td className="px-5 py-4">{role.users_count}</td>
                                                 <td className="px-5 py-4 text-right">
                                                     <IconButton icon="edit" label="Editar rol" type="button" onClick={() => editRole(role)} />
                                                 </td>
                                             </tr>
                                         ))}
+                                        {roleTable.filteredRows.length === 0 && <tr><td colSpan="4" className="p-5"><EmptyState title="Sin roles para esta búsqueda" description="Cambia el filtro o crea un rol autorizado." /></td></tr>}
                                     </tbody>
                                 </table>
                             </div>
@@ -331,8 +356,9 @@ function TextField({ id, label, value, error, onChange, type = 'text' }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <TextInput id={id} type={type} value={value ?? ''} onChange={(event) => onChange(event.target.value)} className="mt-1 block w-full" />
-            <InputError message={error} className="mt-2" />
+            <TextInput id={id} type={type} value={value ?? ''} onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} className="mt-1 block w-full" />
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }
@@ -341,15 +367,17 @@ function SelectField({ id, label, value, options, error, onChange }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? `${id}-error` : undefined}
                 className="mt-1 block w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
             >
                 {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
-            </select>
-            <InputError message={error} className="mt-2" />
+            </LiquidSelect>
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }
@@ -358,9 +386,7 @@ function SwitchField({ label, checked, onChange }) {
     return (
         <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/30 p-4 dark:bg-white/10">
             <p className="font-black">{label}</p>
-            <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition ${checked ? 'bg-brand-primary' : 'bg-stone-400/60'}`}>
-                <span className={`h-6 w-6 rounded-full bg-white shadow transition ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
-            </button>
+            <div className="flex shrink-0 flex-col items-center gap-1"><LiquidToggle ariaLabel={label} checked={checked} onChange={(event) => onChange(event.target.checked)} className="liquid-toggle-only" /><span className="text-xs font-semibold text-app-muted">{checked ? 'Activado' : 'Desactivado'}</span></div>
         </div>
     );
 }

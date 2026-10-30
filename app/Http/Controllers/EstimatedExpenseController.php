@@ -5,6 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\EstimatedExpense;
 use App\Models\ExpenseCategory;
 use App\Models\TripPhase;
+use App\Services\Security\ScopeService;
+use App\Services\Finance\ExpenseMutationService;
+use App\Support\Decimal as D;
+use App\Http\Requests\StoreEstimatedExpenseRequest;
+use App\Http\Requests\UpdateEstimatedExpenseRequest;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,10 +19,12 @@ use Inertia\Response;
 
 class EstimatedExpenseController extends Controller
 {
-    public function index(): Response
+    public function index(ScopeService $scope): Response
     {
+        $actor = request()->user();
         return Inertia::render('EstimatedExpenses/Index', [
-            'estimatedExpenses' => Inertia::defer(fn () => EstimatedExpense::query()
+            // Los datos esenciales llegan juntos: evita formularios vacíos y una segunda navegación.
+            'estimatedExpenses' => fn () => $scope->constrain(EstimatedExpense::query(), $actor, 'estimated_expenses.trip_phase_id')
                 ->select([
                     'id',
                     'trip_phase_id',
@@ -30,19 +37,20 @@ class EstimatedExpenseController extends Controller
                     'fund_type',
                 ])
                 ->with([
-                    'tripPhase:id,project_id,team_id,phase,starts_on,ends_on,status',
+                    'tripPhase:id,project_id,team_id,phase,starts_on,ends_on,status,version',
                     'tripPhase.project:id,code,name',
                     'tripPhase.team:id,name',
                     'expenseCategory:id,name,fund_type,applies_service_fee,applies_contingency,service_fee_percentage',
                 ])
                 ->orderBy('fund_type')
                 ->orderBy('description')
-                ->get(), 'estimated-expenses'),
-            'tripPhases' => Inertia::defer(fn () => TripPhase::query()
-                ->with(['project:id,code,name', 'team:id,name', 'draftPdfFile:id,original_name,object_key'])
+                ->orderBy('id')->cursorPaginate(25),
+            'tripPhases' => fn () => $scope->tripPhases($actor)
+                ->with(['project:id,code,name', 'team:id,name', 'draftPdfFile:id,original_name'])
                 ->orderByDesc('starts_on')
-                ->get(['id', 'project_id', 'team_id', 'phase', 'starts_on', 'ends_on', 'status', 'draft_pdf_file_id']), 'estimated-expenses'),
-            'expenseCategories' => Inertia::defer(fn () => ExpenseCategory::query()
+                ->orderByDesc('id')->limit(25)
+                ->get(['id', 'project_id', 'team_id', 'phase', 'starts_on', 'ends_on', 'status', 'version', 'draft_pdf_file_id']),
+            'expenseCategories' => fn () => ExpenseCategory::query()
                 ->orderBy('name')
                 ->get([
                     'id',
@@ -51,28 +59,34 @@ class EstimatedExpenseController extends Controller
                     'applies_service_fee',
                     'applies_contingency',
                     'service_fee_percentage',
-                ]), 'estimated-expenses'),
+                ]),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreEstimatedExpenseRequest $request): RedirectResponse
     {
-        EstimatedExpense::query()->create($this->validatedData($request));
+        $data = $request->validated();
+        app(ExpenseMutationService::class)->save($request->user(), (int)$data['trip_phase_id'],
+            null, $data, (int)$data['version']);
 
         return back()->with('success', 'Gasto estimado creado correctamente.');
     }
 
-    public function update(Request $request, EstimatedExpense $estimatedExpense): RedirectResponse
+    public function update(UpdateEstimatedExpenseRequest $request, EstimatedExpense $estimatedExpense): RedirectResponse
     {
-        $estimatedExpense->fill($this->validatedData($request))->save();
+        $data = $request->validated();
+        app(ExpenseMutationService::class)->save($request->user(), (int) $estimatedExpense->trip_phase_id,
+            (int) $estimatedExpense->id, $data, (int) $data['version']);
 
         return back()->with('success', 'Gasto estimado actualizado correctamente.');
     }
 
     public function destroy(EstimatedExpense $estimatedExpense): RedirectResponse
     {
+        $version = request()->validate(['version' => ['required', 'integer', 'min:1']]);
         try {
-            $estimatedExpense->delete();
+            app(ExpenseMutationService::class)->delete(request()->user(), (int) $estimatedExpense->trip_phase_id,
+                (int) $estimatedExpense->id, false, (int) $version['version']);
         } catch (QueryException) {
             return back()->withErrors([
                 'estimatedExpense' => 'No se puede eliminar porque esta relacionado con gastos reales.',
@@ -82,24 +96,4 @@ class EstimatedExpenseController extends Controller
         return back()->with('success', 'Gasto estimado eliminado correctamente.');
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function validatedData(Request $request): array
-    {
-        $data = $request->validate([
-            'trip_phase_id' => ['required', 'integer', Rule::exists('trip_phases', 'id')],
-            'expense_category_id' => ['required', 'integer', Rule::exists('expense_categories', 'id')],
-            'description' => ['required', 'string', 'max:255'],
-            'unit' => ['nullable', 'string', 'max:80'],
-            'initial_unit_cost' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
-            'initial_quantity' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
-        ]);
-
-        $category = ExpenseCategory::query()->findOrFail($data['expense_category_id']);
-        $data['fund_type'] = $category->fund_type;
-        $data['estimated_total'] = round((float) $data['initial_unit_cost'] * (float) $data['initial_quantity'], 2);
-
-        return $data;
-    }
 }

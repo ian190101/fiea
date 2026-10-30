@@ -1,3 +1,9 @@
+import { useOptionCollection } from '@/Utils/useOptionCollection';
+import CursorPager from '@/Components/CursorPager';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
+import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
@@ -6,21 +12,30 @@ import TableControls from '@/Components/TableControls';
 import TextInput from '@/Components/TextInput';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useCallback, useMemo, useState } from 'react';
 
-export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
+export default function ReceiptIndex({ actualExpenses: expensePage = [], budgetLines: initialbudgetLines = [], receipts: receiptPage = [], summary = null }) {
+    const budgetLines = useOptionCollection(initialbudgetLines, 'budget-lines');
+    const initialExpenses = Array.isArray(expensePage) ? expensePage : expensePage.data ?? [];
+    const actualExpenses = useOptionCollection(initialExpenses,'actual-expenses');
+    const receipts = Array.isArray(receiptPage) ? receiptPage : receiptPage.data ?? [];
     const { flash } = usePage().props;
     const [editingReceipt, setEditingReceipt] = useState(null);
-    const [expenseFilter, setExpenseFilter] = useState(actualExpenses[0]?.id ?? '');
+    const [expenseFilter, setExpenseFilter] = useState('');
 
     const form = useForm({
         actual_expense_id: expenseFilter,
+        budget_line_id: '',
+        version: actualExpenses[0]?.trip_phase?.version ?? 1,
         receipt_number: '',
         issued_on: '',
-        amount: 0,
+        amount: '0.00',
         file: null,
     });
+    const guard = useUnsavedChangesGuard(form.isDirty);
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
 
     const visibleReceipts = useMemo(() => {
         if (!expenseFilter) {
@@ -43,7 +58,8 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
         [actualExpenses, expenseFilter],
     );
 
-    const summary = useMemo(() => visibleReceipts.reduce((total, receipt) => total + Number(receipt.amount ?? 0), 0), [visibleReceipts]);
+    const amountTotal = summary && String(summary.actual_expense_id ?? '') === String(expenseFilter)
+        ? summary.amount ?? null : null;
 
     const submit = (event) => {
         event.preventDefault();
@@ -71,9 +87,11 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
         form.clearErrors();
         form.setData({
             actual_expense_id: receipt.actual_expense_id,
+            budget_line_id: receipt.budget_line_id ?? '',
+            version: receipt.budget_line?.billing_case?.trip_phase?.version ?? receipt.actual_expense?.trip_phase?.version ?? 1,
             receipt_number: receipt.receipt_number ?? '',
             issued_on: formatDateInput(receipt.issued_on),
-            amount: receipt.amount ?? 0,
+            amount: receipt.amount ?? '0.00',
             file: null,
         });
     };
@@ -81,36 +99,40 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
     const resetForm = () => {
         setEditingReceipt(null);
         form.clearErrors();
-        form.setData({
+        const next = {
             actual_expense_id: expenseFilter,
+            budget_line_id: '',
+            version: actualExpenses.find((expense) => String(expense.id) === String(expenseFilter))?.trip_phase?.version ?? 1,
             receipt_number: '',
             issued_on: '',
-            amount: 0,
+            amount: '0.00',
             file: null,
-        });
+        };
+        form.setData(next);
+        form.setDefaults(next);
     };
 
-    const destroy = (receipt) => {
-        if (!window.confirm(`Eliminar "${receipt.storage_file?.original_name ?? 'comprobante'}"?`)) {
-            return;
-        }
-
-        router.delete(route('receipts.destroy', receipt.id), {
+    const destroy = (receipt) => guard.request(() => setPendingDelete(receipt));
+    const confirmDelete = () => {
+        if (!pendingDelete || deleteBusy) return;
+        setDeleteBusy(true);
+        router.delete(route('receipts.destroy', pendingDelete.id), {
+            data: { version: pendingDelete.budget_line?.billing_case?.trip_phase?.version ?? pendingDelete.actual_expense?.trip_phase?.version ?? 1 },
             preserveScroll: true,
             onSuccess: () => {
-                if (editingReceipt?.id === receipt.id) {
-                    resetForm();
-                }
+                if (editingReceipt?.id === pendingDelete.id) resetForm();
             },
+            onFinish: () => { setDeleteBusy(false); setPendingDelete(null); },
         });
     };
 
-    const changeExpenseFilter = (value) => {
+    const changeExpenseFilter = (value) => guard.request(() => {
         setExpenseFilter(value);
+        router.get(route('receipts.index'),value?{actual_expense_id:value}:{},{preserveState:true,preserveScroll:true});
         if (!editingReceipt) {
-            form.setData('actual_expense_id', value);
+            form.setData({ ...form.data, actual_expense_id: value, budget_line_id:'', version: actualExpenses.find((expense) => String(expense.id) === String(value))?.trip_phase?.version ?? 1 });
         }
-    };
+    });
 
     return (
         <AuthenticatedLayout
@@ -129,10 +151,12 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
+                <CursorPager page={receiptPage} label="recibos" />
+
 
                 <div className="grid gap-4 md:grid-cols-3">
-                    <MetricCard label="Comprobantes" value={visibleReceipts.length} />
-                    <MetricCard label="Monto comprobado" value={formatMoney(summary)} />
+                    <MetricCard label="Comprobantes visibles" value={visibleReceipts.length} />
+                    <MetricCard label="Monto comprobado" value={formatMoney(amountTotal)} />
                     <MetricCard label="Gasto seleccionado" value={selectedExpense ? formatMoney(selectedExpense.real_total) : '-'} />
                 </div>
 
@@ -154,8 +178,14 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
                                 value={form.data.actual_expense_id}
                                 options={actualExpenses.map((expense) => ({ id: expense.id, name: expenseLabel(expense) }))}
                                 error={form.errors.actual_expense_id}
-                                onChange={(value) => form.setData('actual_expense_id', value)}
+                                onChange={(value) => form.setData({ ...form.data, actual_expense_id: value, budget_line_id: '', version: actualExpenses.find((expense) => String(expense.id) === String(value))?.trip_phase?.version ?? 1 })}
                             />
+                            <SelectField id="budget_line_id" label="Línea Final de la matriz" value={form.data.budget_line_id}
+                                options={budgetLines.map(line=>({id:line.id,name:`${line.billing_case?.trip_phase?.project?.code ?? ''} · ${line.description_es ?? line.description_en}`}))}
+                                error={form.errors.budget_line_id} onChange={value=>{
+                                    setExpenseFilter('');
+                                    form.setData({...form.data,budget_line_id:value,actual_expense_id:'',version:budgetLines.find(line=>String(line.id)===String(value))?.billing_case?.trip_phase?.version ?? 1});
+                                }} />
 
                             <TextField
                                 id="receipt_number"
@@ -200,7 +230,7 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
                         </div>
 
                         <div className="mt-6 flex flex-wrap gap-3">
-                            <PrimaryButton disabled={form.processing || actualExpenses.length === 0}>
+                            <PrimaryButton disabled={form.processing || (!form.data.actual_expense_id && !form.data.budget_line_id)}>
                                 {editingReceipt ? 'Guardar cambios' : 'Subir comprobante'}
                             </PrimaryButton>
                             {editingReceipt && (
@@ -218,7 +248,7 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
                                     <h2 className="text-xl font-black">Comprobantes registrados</h2>
                                     <p className="text-sm text-app-muted">{visibleReceipts.length} de {receipts.length} archivos</p>
                                 </div>
-                                <select
+                                <LiquidSelect
                                     value={expenseFilter}
                                     onChange={(event) => changeExpenseFilter(event.target.value)}
                                     className="ios-field text-sm font-bold"
@@ -229,7 +259,7 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
                                             {expenseLabel(expense)}
                                         </option>
                                     ))}
-                                </select>
+                                </LiquidSelect>
                             </div>
                             <TableControls
                                 query={table.query}
@@ -265,8 +295,8 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
                                                 <div className="text-xs text-app-muted">{formatBytes(receipt.storage_file?.size_bytes)}</div>
                                             </td>
                                             <td className="px-5 py-4">
-                                                <div>{receipt.actual_expense?.description ?? '-'}</div>
-                                                <div className="text-xs text-app-muted">{receipt.actual_expense?.trip_phase?.project?.code ?? '-'}</div>
+                                                <div>{receipt.actual_expense?.description ?? receipt.budget_line?.description_es ?? receipt.budget_line?.description_en ?? '-'}</div>
+                                                <div className="text-xs text-app-muted">{receipt.actual_expense?.trip_phase?.project?.code ?? receipt.budget_line?.billing_case?.trip_phase?.project?.code ?? '-'}</div>
                                             </td>
                                             <td className="px-5 py-4">{receipt.receipt_number || '-'}</td>
                                             <td className="px-5 py-4">{formatDateInput(receipt.issued_on) || '-'}</td>
@@ -293,6 +323,10 @@ export default function ReceiptIndex({ actualExpenses = [], receipts = [] }) {
                     </div>
                 </section>
             </div>
+            <FinancialActionSheet open={Boolean(pendingDelete)} busy={deleteBusy} title="Eliminar registro"
+                description={pendingDelete ? `Se eliminará «${pendingDelete.storage_file?.original_name ?? 'comprobante'}». Confirma solo si corresponde a un borrador.` : ''}
+                confirmLabel="Eliminar" onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
+            <FinancialActionSheet {...guard.dialogProps} />
         </AuthenticatedLayout>
     );
 }
@@ -322,7 +356,7 @@ function SelectField({ id, label, value, options, error, onChange }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -334,7 +368,7 @@ function SelectField({ id, label, value, options, error, onChange }) {
                         {option.name}
                     </option>
                 ))}
-            </select>
+            </LiquidSelect>
             <InputError message={error} className="mt-2" />
         </div>
     );
@@ -361,12 +395,6 @@ function expenseLabel(expense) {
     return `${expense.trip_phase?.project?.code ?? 'Sin proyecto'} - ${expense.description} (${formatMoney(expense.real_total)})`;
 }
 
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
-}
 
 function formatDateInput(value) {
     return value ? String(value).slice(0, 10) : '';

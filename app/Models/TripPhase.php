@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TripPhase extends Model
 {
@@ -21,7 +22,7 @@ class TripPhase extends Model
 
     protected function casts(): array
     {
-        return ['starts_on' => 'date', 'ends_on' => 'date'];
+        return ['starts_on' => 'date', 'ends_on' => 'date', 'version' => 'integer'];
     }
 
     public function project()
@@ -47,6 +48,11 @@ class TripPhase extends Model
     public function actualExpenses()
     {
         return $this->hasMany(ActualExpense::class);
+    }
+
+    public function billingCases(): HasMany
+    {
+        return $this->hasMany(BillingCase::class);
     }
 
     public function draftPdfFile()

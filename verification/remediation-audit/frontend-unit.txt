@@ -1,0 +1,16 @@
+✔ oculta credenciales dentro del cuerpo JSON de Axios (2.8536ms)
+✔ tolera referencias circulares y omite cuerpos que no son JSON (1.0476ms)
+✔ el contenido lateral y los formularios sin superposición no se rasterizan (2.3377ms)
+✔ el botón del login y la lente de prueba conservan el contenido real que refractan (0.5476ms)
+✔ el motor aplica el filtro tanto al precalentamiento como al contenido mutado (3.1646ms)
+✔ un frame en reposo no consulta el DOM ni vuelve a ejecutar el shader (1.0354ms)
+✔ muestra nombres comprensibles y conserva los campos al guardar (2.4859ms)
+✔ permite insertar campos y genera una vista previa sin marcadores técnicos (0.8038ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 249.5686

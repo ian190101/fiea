@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Exceptions\MailPreparationException;
 use App\Models\EmailLog;
+use App\Models\StorageFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -10,58 +12,70 @@ use RuntimeException;
 class TransactionalMailService
 {
     /**
-     * @param array<int, string> $to
-     * @param array<int, string> $cc
-     * @param array<int, string> $bcc
+     * @param  array<int, string>  $to
+     * @param  array<int, string>  $cc
+     * @param  array<int, string>  $bcc
      */
     public function sendInvoice(EmailLog $emailLog, array $to, array $cc = [], array $bcc = []): string
     {
         return match ((string) config('services.transactional_mail.provider', 'resend')) {
             'resend' => $this->sendWithResend($emailLog, $to, $cc, $bcc),
-            default => throw new RuntimeException('Proveedor de correo transaccional no soportado.'),
+            default => throw new MailPreparationException('Proveedor de correo transaccional no soportado.'),
         };
     }
 
     /**
-     * @param array<int, string> $to
-     * @param array<int, string> $cc
-     * @param array<int, string> $bcc
+     * @param  array<int, string>  $to
+     * @param  array<int, string>  $cc
+     * @param  array<int, string>  $bcc
      */
     private function sendWithResend(EmailLog $emailLog, array $to, array $cc, array $bcc): string
     {
-        $apiKey = (string) config('services.resend.key');
+        try {
+            $apiKey = (string) config('services.resend.key');
 
-        if ($apiKey === '') {
-            throw new RuntimeException('RESEND_API_KEY no esta configurado.');
+            if ($apiKey === '') {
+                throw new RuntimeException('RESEND_API_KEY no esta configurado.');
+            }
+
+            $payload = array_filter([
+                'from' => $this->fromAddress(),
+                'to' => $to,
+                'cc' => $cc,
+                'bcc' => $bcc,
+                'subject' => $emailLog->subject,
+                'html' => view('mail.invoice-prepared', [
+                    'body' => $emailLog->body,
+                    'invoice' => $emailLog->invoice,
+                ])->render(),
+                'text' => $emailLog->body,
+                'attachments' => $this->attachments($emailLog),
+                'tags' => [
+                    ['name' => 'module', 'value' => 'invoice_emails'],
+                    ['name' => 'email_log_id', 'value' => (string) $emailLog->id],
+                ],
+            ], fn ($value) => $value !== [] && $value !== null && $value !== '');
+
+            $endpoint = (string) config('services.resend.endpoint');
+            if (parse_url($endpoint, PHP_URL_SCHEME) !== 'https'
+                || parse_url($endpoint, PHP_URL_HOST) !== 'api.resend.com') {
+                throw new RuntimeException('Endpoint de correo transaccional no permitido.');
+            }
+            if (! $emailLog->delivery_key || ! $emailLog->recipients_snapshot || ! $emailLog->attachment_snapshot) {
+                throw new RuntimeException('El correo no tiene una preparación inmutable.');
+            }
+        } catch (\Throwable $exception) {
+            throw new MailPreparationException('La preparación local del correo no está disponible.', 0, $exception);
         }
-
-        $payload = array_filter([
-            'from' => $this->fromAddress(),
-            'to' => $to,
-            'cc' => $cc,
-            'bcc' => $bcc,
-            'subject' => $emailLog->subject,
-            'html' => view('mail.invoice-prepared', [
-                'body' => $emailLog->body,
-                'invoice' => $emailLog->invoice,
-            ])->render(),
-            'text' => $emailLog->body,
-            'attachments' => $this->attachments($emailLog),
-            'tags' => [
-                ['name' => 'module', 'value' => 'invoice_emails'],
-                ['name' => 'email_log_id', 'value' => (string) $emailLog->id],
-            ],
-        ], fn ($value) => $value !== [] && $value !== null && $value !== '');
-
-        $response = Http::timeout((int) config('services.resend.timeout', 30))
+        $response = Http::connectTimeout(5)->timeout(30)
             ->withToken($apiKey)
             ->withHeaders([
-                'Idempotency-Key' => 'invoice-email-'.$emailLog->id.'-'.$emailLog->retry_count,
+                'Idempotency-Key' => 'invoice-email-'.$emailLog->delivery_key,
             ])
-            ->post((string) config('services.resend.endpoint'), $payload);
+            ->post($endpoint, $payload);
 
         if ($response->failed()) {
-            throw new RuntimeException('Resend rechazo el correo: '.$response->body());
+            throw new RuntimeException('El proveedor rechazó el correo.');
         }
 
         return (string) ($response->json('id') ?? '');
@@ -80,16 +94,23 @@ class TransactionalMailService
      */
     private function attachments(EmailLog $emailLog): array
     {
-        $file = $emailLog->invoice?->pdfFile;
+        $snapshot = $emailLog->attachment_snapshot;
+        $file = StorageFile::query()->find($snapshot['storage_file_id'] ?? null);
 
-        if (! $file || ! Storage::disk($file->diskName())->exists($file->object_key)) {
-            return [];
+        if (! $file || ! hash_equals((string) ($snapshot['checksum'] ?? ''), (string) $file->checksum)
+            || ! Storage::disk($file->diskName())->exists($file->object_key)) {
+            throw new RuntimeException('El adjunto congelado no está disponible.');
+        }
+
+        $bytes = Storage::disk($file->diskName())->get($file->object_key);
+        if (! hash_equals((string) $snapshot['checksum'], hash('sha256', $bytes)) || strlen($bytes) !== (int) $file->size_bytes) {
+            throw new RuntimeException('El contenido del adjunto no coincide con su preparación.');
         }
 
         return [[
-            'filename' => $file->original_name,
-            'content' => base64_encode(Storage::disk($file->diskName())->get($file->object_key)),
-            'content_type' => $file->mime_type ?: 'application/pdf',
+            'filename' => $snapshot['filename'],
+            'content' => base64_encode($bytes),
+            'content_type' => $snapshot['mime_type'],
         ]];
     }
 }

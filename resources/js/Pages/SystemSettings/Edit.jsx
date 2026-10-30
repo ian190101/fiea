@@ -1,6 +1,8 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useMemo } from 'react';
@@ -12,29 +14,34 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
         primary_color: settings.primary_color ?? '#2563eb',
         secondary_color: settings.secondary_color ?? '#0f766e',
         accent_color: settings.accent_color ?? '#f59e0b',
-        lock_final_invoice_by_default: Boolean(settings.lock_final_invoice_by_default),
-        accounting_can_edit_summary: Boolean(settings.accounting_can_edit_summary),
         logo: null,
     });
+    const guard = useUnsavedChangesGuard(form.isDirty && !form.processing);
+    // El acento es decorativo; el texto blanco se muestra sobre primario y secundario.
+    const contrastProblems = ['primary_color', 'secondary_color']
+        .filter((field) => contrastAgainstWhite(form.data[field]) < 4.5);
 
     const previewStyle = useMemo(() => ({
         '--preview-primary': form.data.primary_color,
         '--preview-secondary': form.data.secondary_color,
         '--preview-accent': form.data.accent_color,
     }), [form.data.primary_color, form.data.secondary_color, form.data.accent_color]);
+    const brandingPreview = useMemo(() => ({ primaryColor: form.data.primary_color, secondaryColor: form.data.secondary_color, accentColor: form.data.accent_color }), [form.data.primary_color, form.data.secondary_color, form.data.accent_color]);
 
     const submit = (event) => {
         event.preventDefault();
+        if (contrastProblems.length) return;
 
         form.post(route('system-settings.update'), {
             preserveScroll: true,
             forceFormData: true,
-            onSuccess: () => form.setData('logo', null),
+            onSuccess: () => { form.setData('logo', null); form.setDefaults({ ...form.data, logo: null }); },
         });
     };
 
     return (
         <AuthenticatedLayout
+            brandingPreview={brandingPreview}
             header={
                 <div className="flex flex-col gap-2">
                     <p className="text-sm font-semibold uppercase tracking-wide text-brand-primary">Configuracion</p>
@@ -43,6 +50,7 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
             }
         >
             <Head title="Configuracion" />
+            <FinancialActionSheet {...guard.dialogProps} />
 
             <div className="max-w-6xl space-y-6">
                 <FlashMessages flash={flash} />
@@ -84,11 +92,13 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
                                 <input
                                     id="logo"
                                     type="file"
-                                    accept=".png,.jpg,.jpeg,.webp,.svg"
+                                    accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                                    aria-invalid={Boolean(form.errors.logo)}
+                                    aria-describedby={form.errors.logo ? 'logo-error' : undefined}
                                     onChange={(event) => form.setData('logo', event.target.files?.[0] ?? null)}
                                     className="mt-1 block w-full rounded-xl border border-app-border bg-white/70 px-3 py-2 text-sm text-app-text file:mr-3 file:rounded-xl file:border-0 file:bg-brand-primary file:px-3 file:py-2 file:text-sm file:font-black file:text-white dark:bg-stone-900/70"
                                 />
-                                <InputError message={form.errors.logo} className="mt-2" />
+                                <InputError id="logo-error" message={form.errors.logo} className="mt-2" />
                                 {settings.logo && (
                                     <p className="mt-2 text-xs font-bold text-app-muted">
                                         Actual: {settings.logo.original_name} ({settings.logo.provider})
@@ -96,22 +106,12 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
                                 )}
                             </div>
 
-                            <SwitchField
-                                label="Bloquear final invoice por defecto"
-                                description="Cuando esta activo, un invoice final queda protegido al crearse."
-                                checked={form.data.lock_final_invoice_by_default}
-                                onChange={(checked) => form.setData('lock_final_invoice_by_default', checked)}
-                            />
-                            <SwitchField
-                                label="Contabilidad puede corregir resumen"
-                                description="Si esta apagado, contabilidad solo visualiza y reconcilia."
-                                checked={form.data.accounting_can_edit_summary}
-                                onChange={(checked) => form.setData('accounting_can_edit_summary', checked)}
-                            />
+                            <p className="text-sm">Los borradores permiten revisión. Aprobar un documento congela sus importes y su evidencia. Contabilidad registra sus conciliaciones por separado.</p>
                         </div>
 
                         <div className="mt-6">
-                            <PrimaryButton disabled={form.processing}>Guardar configuracion</PrimaryButton>
+                            {contrastProblems.length > 0 && <p role="alert" className="mb-3 text-sm font-semibold text-red-700 dark:text-red-200">Elige un tono más oscuro para {contrastProblems.map((field) => field === 'primary_color' ? 'el color primario' : 'el color secundario').join(' y ')} para mantener legibles los botones.</p>}
+                            <PrimaryButton disabled={form.processing || contrastProblems.length > 0}>Guardar configuracion</PrimaryButton>
                         </div>
                     </form>
 
@@ -143,8 +143,8 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
                         <div className="glass-panel rounded-[2rem] p-5">
                             <h2 className="text-xl font-black">Estado actual</h2>
                             <div className="mt-4 grid gap-3 text-sm">
-                                <StatusRow label="Final invoice" value={form.data.lock_final_invoice_by_default ? 'Bloqueado por defecto' : 'Editable por defecto'} />
-                                <StatusRow label="Contabilidad" value={form.data.accounting_can_edit_summary ? 'Puede corregir/importar resumen' : 'Solo visualiza/reconcilia'} />
+                                <StatusRow label="Documentos" value="Protegidos al aprobar" />
+                                <StatusRow label="Contabilidad" value="Conciliación independiente" />
                                 <StatusRow label="Ultima actualizacion" value={formatDate(settings.updated_at)} />
                                 <StatusRow label="Actualizado por" value={settings.updated_by?.name ?? '-'} />
                             </div>
@@ -169,7 +169,7 @@ function StorageStatusCard({ storageStatus }) {
                     <p className="mt-1 text-sm text-app-muted">Aplica a logos, PDFs y comprobantes.</p>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${ready ? 'bg-emerald-400/20 text-emerald-800 dark:text-emerald-100' : 'bg-amber-400/20 text-amber-800 dark:text-amber-100'}`}>
-                    {ready ? 'R2 activo' : 'Fallback local'}
+                    {ready ? 'R2 activo' : 'Almacenamiento local'}
                 </span>
             </div>
 
@@ -228,38 +228,24 @@ function ColorField({ id, label, value, error, onChange }) {
                     type="color"
                     value={value}
                     onChange={(event) => onChange(event.target.value)}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? `${id}-error` : undefined}
                     className="h-11 w-full rounded-xl border border-app-border bg-white/70 p-1 dark:bg-stone-900/70"
                 />
                 <input
+                    aria-label={`${label}, valor hexadecimal`}
                     value={value}
                     onChange={(event) => onChange(event.target.value)}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? `${id}-error` : undefined}
                     className="block w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
                 />
             </div>
-            <InputError message={error} className="mt-2" />
+            <InputError id={`${id}-error`} message={error} className="mt-2" />
         </div>
     );
 }
 
-function SwitchField({ label, description, checked, onChange }) {
-    return (
-        <div className="flex items-center justify-between gap-4 rounded-2xl bg-white/30 p-4 dark:bg-white/10">
-            <div>
-                <p className="font-black">{label}</p>
-                <p className="mt-1 text-sm text-app-muted">{description}</p>
-            </div>
-            <button
-                type="button"
-                role="switch"
-                aria-checked={checked}
-                onClick={() => onChange(!checked)}
-                className={`flex h-8 w-14 shrink-0 items-center rounded-full p-1 transition ${checked ? 'bg-brand-primary' : 'bg-stone-400/60'}`}
-            >
-                <span className={`h-6 w-6 rounded-full bg-white shadow transition ${checked ? 'translate-x-6' : 'translate-x-0'}`} />
-            </button>
-        </div>
-    );
-}
 
 function LogoPreview({ settings }) {
     if (settings.logo?.public_url) {
@@ -300,4 +286,11 @@ function formatDate(value) {
         dateStyle: 'medium',
         timeStyle: 'short',
     }).format(new Date(value));
+}
+
+function contrastAgainstWhite(hex) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex ?? '')) return 0;
+    const channels = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255);
+    const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 1.05 / (0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2] + 0.05);
 }

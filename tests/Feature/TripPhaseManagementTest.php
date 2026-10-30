@@ -12,11 +12,13 @@ use App\Models\Team;
 use App\Models\TripPhase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class TripPhaseManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_trip_phases(): void
     {
@@ -26,7 +28,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_trip_phases(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
 
         $this->actingAs($user)
             ->get('/viajes')
@@ -35,7 +37,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_trip_phases(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         $technician = $this->createTechnician();
         [$project, $team] = $this->createProjectAndTeam();
 
@@ -67,7 +69,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_trip_phase_can_be_created_without_assigned_technician(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         [$project, $team] = $this->createProjectAndTeam();
 
         $this->actingAs($user)
@@ -95,7 +97,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_trip_phase_rejects_end_date_before_start_date(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         [$project, $team] = $this->createProjectAndTeam();
 
         $this->actingAs($user)
@@ -115,7 +117,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_trip_phase_rejects_invalid_status(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         [$project, $team] = $this->createProjectAndTeam();
 
         $this->actingAs($user)
@@ -135,7 +137,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_trip_phase_rejects_negative_counts(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         [$project, $team] = $this->createProjectAndTeam();
 
         $this->actingAs($user)
@@ -155,7 +157,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_authenticated_users_can_update_trip_phases(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         [$project, $team] = $this->createProjectAndTeam();
         $tripPhase = TripPhase::query()->create([
             'project_id' => $project->id,
@@ -172,6 +174,7 @@ class TripPhaseManagementTest extends TestCase
 
         $this->actingAs($user)
             ->patch(route('trip-phases.update', $tripPhase->id), [
+                'version' => $tripPhase->fresh()->version,
                 'project_id' => $project->id,
                 'team_id' => $team->id,
                 'assigned_technician_id' => null,
@@ -195,7 +198,7 @@ class TripPhaseManagementTest extends TestCase
 
     public function test_authenticated_users_can_delete_unused_trip_phases(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         [$project, $team] = $this->createProjectAndTeam();
         $tripPhase = TripPhase::query()->create([
             'project_id' => $project->id,
@@ -211,7 +214,7 @@ class TripPhaseManagementTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->delete(route('trip-phases.destroy', $tripPhase->id))
+            ->delete(route('trip-phases.destroy', $tripPhase->id), ['version' => $tripPhase->fresh()->version])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
@@ -227,7 +230,7 @@ class TripPhaseManagementTest extends TestCase
             'name' => 'Tecnico',
             'description' => null,
         ]);
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['trip_phases.view', 'trip_phases.manage']);
         $user->roles()->sync([$role->id]);
 
         return $user;

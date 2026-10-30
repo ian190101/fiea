@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 class BrandingAssetService
 {
     private const SETTINGS_CACHE_KEY = 'fiea:branding:settings';
+
     private const LOGO_DATA_CACHE_PREFIX = 'fiea:branding:logo-data:';
 
     /**
@@ -40,7 +41,7 @@ class BrandingAssetService
             return null;
         }
 
-        return route('branding.logo', ['v' => $file->updated_at?->timestamp ?? $file->id]);
+        return route('branding.logo', ['v' => $file->checksum ?: $file->id]);
     }
 
     public function logoDataUri(): ?string
@@ -83,7 +84,8 @@ class BrandingAssetService
 
     /**
      * @template T
-     * @param callable(): T $callback
+     *
+     * @param  callable(): T  $callback
      * @return T
      */
     private function remember(string $key, int $seconds, callable $callback): mixed

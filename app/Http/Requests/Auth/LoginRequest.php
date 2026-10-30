@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Rules\PasswordByteLength;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,7 +30,7 @@ class LoginRequest extends FormRequest
     {
         return [
             'username' => ['required', 'string', 'max:120'],
-            'password' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'max:255', new PasswordByteLength],
         ];
     }
 
@@ -42,8 +43,10 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
+        $identifier = $this->string('username')->lower()->trim()->toString();
+        $column = str_contains($identifier, '@') ? 'email' : 'username_normalized';
         if (! Auth::attempt([
-            'username' => $this->string('username')->lower()->toString(),
+            $column => $identifier,
             'password' => $this->string('password')->toString(),
             'is_active' => true,
         ], $this->boolean('remember'))) {

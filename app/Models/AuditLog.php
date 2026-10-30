@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class AuditLog extends Model
 {
+    protected static function booted(): void
+    {
+        static::creating(function (self $log): void {
+            $id = request()?->attributes->get('correlation_id');
+            if ($log->correlation_id === null && is_string($id)) $log->correlation_id = $id;
+        });
+    }
     protected $fillable = [
         'user_id',
         'action',
@@ -15,6 +22,8 @@ class AuditLog extends Model
         'ip_address',
         'user_agent',
         'metadata',
+        'trip_phase_id',
+        'correlation_id',
     ];
 
     protected function casts(): array

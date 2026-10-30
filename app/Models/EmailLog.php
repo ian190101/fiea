@@ -26,6 +26,9 @@ class EmailLog extends Model
             'last_attempted_at' => 'datetime',
             'next_retry_at' => 'datetime',
             'sent_at' => 'datetime',
+            'recipients_snapshot' => 'array',
+            'attachment_snapshot' => 'array',
+            'dispatch_deadline' => 'datetime',
         ];
     }
 

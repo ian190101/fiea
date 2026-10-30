@@ -7,11 +7,13 @@ use App\Models\Country;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class ProjectManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_projects(): void
     {
@@ -21,7 +23,7 @@ class ProjectManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_projects(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['projects.view', 'projects.manage']);
 
         $this->actingAs($user)
             ->get('/proyectos')
@@ -30,7 +32,7 @@ class ProjectManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_projects(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['projects.view', 'projects.manage']);
         [$country, $community] = $this->createCountryAndCommunity();
 
         $this->actingAs($user)
@@ -56,7 +58,7 @@ class ProjectManagementTest extends TestCase
 
     public function test_project_code_must_be_unique(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['projects.view', 'projects.manage']);
         [$country] = $this->createCountryAndCommunity();
         Project::query()->create([
             'country_id' => $country->id,
@@ -83,7 +85,7 @@ class ProjectManagementTest extends TestCase
 
     public function test_project_rejects_community_from_a_different_country(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['projects.view', 'projects.manage']);
         [$firstCountry] = $this->createCountryAndCommunity('Bolivia', 'Santa Rosa');
         [, $secondCommunity] = $this->createCountryAndCommunity('Honduras', 'Cerritos');
 
@@ -102,7 +104,7 @@ class ProjectManagementTest extends TestCase
 
     public function test_closed_date_must_not_be_before_started_date(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['projects.view', 'projects.manage']);
         [$country] = $this->createCountryAndCommunity();
 
         $this->actingAs($user)
@@ -120,7 +122,7 @@ class ProjectManagementTest extends TestCase
 
     public function test_authenticated_users_can_update_projects(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['projects.view', 'projects.manage']);
         [$country, $community] = $this->createCountryAndCommunity();
         $project = Project::query()->create([
             'country_id' => $country->id,
@@ -154,7 +156,7 @@ class ProjectManagementTest extends TestCase
 
     public function test_authenticated_users_can_delete_unused_projects(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['projects.view', 'projects.manage']);
         [$country] = $this->createCountryAndCommunity();
         $project = Project::query()->create([
             'country_id' => $country->id,

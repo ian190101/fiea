@@ -1,0 +1,46 @@
+{
+  "casos": 4,
+  "conformes": 4,
+  "fallos_contrato": 0,
+  "errores_ejecucion": 0,
+  "resultados": [
+    {
+      "nombre": "Comprobante de línea 26 conserva versión y sube archivo mediante Inertia real",
+      "observado": {
+        "linea": 26,
+        "version": 42,
+        "archivo": "multipart",
+        "sin_gasto_duplicado": true
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "Inicio de matriz pide fecha y crea expediente solo al enviar",
+      "observado": {
+        "invoice_type": "IC",
+        "billing_mode": "final_only",
+        "metadata": {
+          "document_date": "2025-07-10"
+        }
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "Descarga CSV usa navegación nativa sin cabeceras Inertia",
+      "observado": {
+        "descarga": "auditoria.csv",
+        "inertia": false
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "Catálogos de lectura ocultan formulario y acciones de escritura",
+      "observado": {
+        "lectura": true,
+        "acciones_crud": 0
+      },
+      "estado": "conforme"
+    }
+  ],
+  "limite": "Navegador temporal con React/Inertia instalados. Transporte interceptado y datos sintéticos; sin operaciones reales."
+}

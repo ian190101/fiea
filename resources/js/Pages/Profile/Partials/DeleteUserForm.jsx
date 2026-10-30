@@ -55,27 +55,26 @@ export default function DeleteUserForm({ className = '' }) {
                 </p>
             </header>
 
-            <DangerButton onClick={confirmUserDeletion}>
+            <DangerButton type="button" onClick={confirmUserDeletion}>
                 Eliminar cuenta
             </DangerButton>
 
-            <Modal show={confirmingUserDeletion} onClose={closeModal}>
+            <Modal show={confirmingUserDeletion} onClose={closeModal}
+                title="Confirmar eliminación de cuenta"
+                description="Ingresa tu contraseña para eliminar tu cuenta permanentemente.">
                 <form onSubmit={deleteUser} className="p-6">
-                    <h2 className="text-lg font-black text-app-text">Confirmar eliminacion de cuenta</h2>
-
-                    <p className="mt-1 text-sm text-app-muted">
-                        Ingresa tu contrasena para confirmar que quieres eliminar tu cuenta permanentemente.
-                    </p>
 
                     <div className="mt-6">
                         <InputLabel
                             htmlFor="password"
-                            value="Password"
+                            value="Contraseña"
                             className="sr-only"
                         />
 
                         <TextInput
                             id="password"
+                        aria-invalid={Boolean(errors.password)}
+                        aria-describedby={errors.password ? "password-error" : undefined}
                             type="password"
                             name="password"
                             ref={passwordInput}
@@ -84,22 +83,22 @@ export default function DeleteUserForm({ className = '' }) {
                                 setData('password', e.target.value)
                             }
                             className="mt-1 block w-3/4"
-                            isFocused
+                            autoComplete="current-password"
                             placeholder="Contrasena"
                         />
 
-                        <InputError
+                        <InputError id="password-error"
                             message={errors.password}
                             className="mt-2"
                         />
                     </div>
 
                     <div className="mt-6 flex justify-end">
-                        <SecondaryButton onClick={closeModal}>
+                        <SecondaryButton onClick={closeModal} data-autofocus>
                             Cancelar
                         </SecondaryButton>
 
-                        <DangerButton className="ms-3" disabled={processing}>
+                        <DangerButton type="submit" className="ms-3" disabled={processing}>
                             Eliminar cuenta
                         </DangerButton>
                     </div>

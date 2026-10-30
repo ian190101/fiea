@@ -1,342 +1,52 @@
 <?php
-
+declare(strict_types=1);
 namespace Tests\Feature;
 
-use App\Mail\InvoicePreparedMail;
-use App\Models\ActualExpense;
-use App\Models\Chapter;
-use App\Models\ChapterType;
-use App\Models\Community;
-use App\Models\ContactPerson;
-use App\Models\Country;
-use App\Models\EmailLog;
-use App\Models\EstimatedExpense;
-use App\Models\ExpenseCategory;
-use App\Models\Invoice;
-use App\Models\Project;
-use App\Models\Receipt;
-use App\Models\StorageFile;
-use App\Models\SystemSetting;
-use App\Models\Team;
-use App\Models\TripPhase;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
+use App\Data\Financial\BudgetLineData;
+use App\Data\Financial\CalculationInput;
+use App\Data\Financial\ReconciliationInput;
+use App\Services\Finance\IcInvoiceCalculator;
+use App\Services\Finance\InvoiceTotalsFactory;
+use App\Services\Finance\MatInvoiceCalculator;
+use App\Services\Finance\ReconciliationService;
 use Tests\TestCase;
 
-class FullWorkflowAcceptanceTest extends TestCase
+final class FullWorkflowAcceptanceTest extends TestCase
 {
-    use RefreshDatabase;
-
-    public function test_financial_workflow_from_budget_to_accounting_report(): void
+    public function test_calculo_initial_final_y_conciliacion_separan_documento_de_caja(): void
     {
-        Storage::fake('local');
-        Mail::fake();
-        config([
-            'filesystems.default' => 'local',
-            'queue.default' => 'sync',
-        ]);
+        $ic=new IcInvoiceCalculator(new InvoiceTotalsFactory());
+        $lines=[new BudgetLineData(1,'dr','60.00',true),
+            new BudgetLineData(2,'dr','440.00',false)];
+        $initial=$ic->calculate(new CalculationInput('initial',$lines));
+        self::assertSame('550.00',$initial->totalDr);
+        self::assertSame('83.00',$initial->totalWodr);
+        self::assertSame('633.00',$initial->total);
+        $final=$ic->calculate(new CalculationInput('final',$lines,'80.00','0.00',$initial->total));
+        self::assertSame('500.00',$final->totalDr);
+        self::assertSame('83.00',$final->totalWodr);
+        self::assertSame('583.00',$final->total);
+        self::assertSame('-50.00',$final->balanceDue);
 
-        $user = User::factory()->create();
-        $context = $this->createBaseContext($user);
-
-        $this->actingAs($user)
-            ->post(route('trip-phases.store'), [
-                'project_id' => $context['project']->id,
-                'team_id' => $context['team']->id,
-                'assigned_technician_id' => $user->id,
-                'phase' => 'Initial Visit',
-                'starts_on' => '2026-07-01',
-                'ends_on' => '2026-07-10',
-                'volunteer_count' => 10,
-                'staff_count' => 2,
-                'status' => 'scheduled',
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $tripPhase = TripPhase::query()->firstOrFail();
-
-        $this->actingAs($user)
-            ->post(route('estimated-expenses.store'), [
-                'trip_phase_id' => $tripPhase->id,
-                'expense_category_id' => $context['drCategory']->id,
-                'description' => 'Hotel rooms',
-                'unit' => 'night',
-                'initial_unit_cost' => 125,
-                'initial_quantity' => 4,
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $this->actingAs($user)
-            ->post(route('estimated-expenses.store'), [
-                'trip_phase_id' => $tripPhase->id,
-                'expense_category_id' => $context['wodrCategory']->id,
-                'description' => 'Wire transfer fee',
-                'unit' => 'fee',
-                'initial_unit_cost' => 30,
-                'initial_quantity' => 1,
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $this->assertDatabaseHas('estimated_expenses', [
-            'description' => 'Hotel rooms',
-            'fund_type' => 'DR',
-            'estimated_total' => 500,
-        ]);
-        $this->assertDatabaseHas('estimated_expenses', [
-            'description' => 'Wire transfer fee',
-            'fund_type' => 'WODR',
-            'estimated_total' => 30,
-        ]);
-
-        $this->actingAs($user)
-            ->post(route('draft-budget-pdf.store', $tripPhase->id))
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $draftFile = StorageFile::query()->findOrFail($tripPhase->refresh()->draft_pdf_file_id);
-        Storage::disk('local')->assertExists($draftFile->object_key);
-        $this->assertStringStartsWith('%PDF', Storage::disk('local')->get($draftFile->object_key));
-
-        $estimatedExpense = EstimatedExpense::query()->where('description', 'Hotel rooms')->firstOrFail();
-
-        $this->actingAs($user)
-            ->post(route('actual-expenses.store'), [
-                'trip_phase_id' => $tripPhase->id,
-                'estimated_expense_id' => $estimatedExpense->id,
-                'expense_category_id' => $context['drCategory']->id,
-                'description' => 'Hotel rooms final',
-                'unit' => 'night',
-                'final_unit_cost' => 130,
-                'final_quantity' => 4,
-                'receipt_number' => 'REC-001',
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $this->actingAs($user)
-            ->post(route('actual-expenses.store'), [
-                'trip_phase_id' => $tripPhase->id,
-                'estimated_expense_id' => null,
-                'expense_category_id' => $context['wodrCategory']->id,
-                'description' => 'Wire transfer fee final',
-                'unit' => 'fee',
-                'final_unit_cost' => 35,
-                'final_quantity' => 1,
-                'receipt_number' => 'REC-002',
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $actualExpense = ActualExpense::query()->where('description', 'Hotel rooms final')->firstOrFail();
-
-        $this->actingAs($user)
-            ->post(route('receipts.store'), [
-                'actual_expense_id' => $actualExpense->id,
-                'receipt_number' => 'REC-001',
-                'issued_on' => '2026-07-05',
-                'amount' => 520,
-                'file' => UploadedFile::fake()->create('receipt.pdf', 20, 'application/pdf'),
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $receipt = Receipt::query()->with('storageFile')->firstOrFail();
-        Storage::disk('local')->assertExists($receipt->storageFile->object_key);
-
-        $this->actingAs($user)
-            ->post(route('invoices.store'), [
-                'trip_phase_id' => $tripPhase->id,
-                'contact_person_id' => $context['contact']->id,
-                'type' => 'IC',
-                'stage' => 'initial',
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $this->actingAs($user)
-            ->post(route('invoices.store'), [
-                'trip_phase_id' => $tripPhase->id,
-                'contact_person_id' => $context['contact']->id,
-                'type' => 'MAT',
-                'stage' => 'initial',
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $icInvoice = Invoice::query()->where('type', 'IC')->firstOrFail();
-        $matInvoice = Invoice::query()->where('type', 'MAT')->firstOrFail();
-
-        $this->assertNotSame($icInvoice->code, $matInvoice->code);
-        $this->assertStringContainsString('IC', $icInvoice->code);
-        $this->assertStringContainsString('MAT', $matInvoice->code);
-        $this->assertSame('520.00', $icInvoice->total_dr);
-        $this->assertSame('35.00', $icInvoice->total_wodr);
-        $this->assertSame('555.00', $icInvoice->grand_total);
-        $this->assertSame('455.00', $icInvoice->balance_conciliation);
-
-        $this->actingAs($user)
-            ->post(route('invoices.approve', $icInvoice->id))
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $this->actingAs($user)
-            ->post(route('invoices.pdf.store', $icInvoice->id))
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $invoiceFile = StorageFile::query()->findOrFail($icInvoice->refresh()->pdf_file_id);
-        Storage::disk('local')->assertExists($invoiceFile->object_key);
-        $this->assertStringStartsWith('%PDF', Storage::disk('local')->get($invoiceFile->object_key));
-
-        $this->actingAs($user)
-            ->post(route('invoice-emails.store', $icInvoice->id), [
-                'subject' => 'FIEA IC Initial Invoice',
-                'body' => 'Hello, please find the invoice attached.',
-                'recipients' => [
-                    [
-                        'contact_person_id' => $context['contact']->id,
-                        'email' => 'billing@example.com',
-                        'recipient_type' => 'to',
-                    ],
-                ],
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $emailLog = EmailLog::query()->firstOrFail();
-
-        $this->actingAs($user)
-            ->post(route('invoice-emails.send', $emailLog->id))
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        Mail::assertSent(InvoicePreparedMail::class, 1);
-        $this->assertSame('sent', $emailLog->refresh()->status);
-        $this->assertSame('sent', $icInvoice->refresh()->status);
-
-        $this->actingAs($user)
-            ->patch(route('accounting.update', $icInvoice->id), [
-                'accounting_status' => 'reconciled',
-                'accounting_note' => 'Conciliado contra resumen contable.',
-            ])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect();
-
-        $this->assertDatabaseHas('invoices', [
-            'id' => $icInvoice->id,
-            'accounting_status' => 'reconciled',
-            'accounting_reviewed_by_id' => $user->id,
-        ]);
-        $this->assertDatabaseHas('audit_logs', [
-            'action' => 'accounting_reconciled',
-            'module' => 'accounting',
-            'auditable_type' => Invoice::class,
-            'auditable_id' => $icInvoice->id,
-        ]);
-
-        $response = $this->actingAs($user)
-            ->get(route('reports.export', ['project_id' => $context['project']->id]))
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
-
-        $csv = $response->streamedContent();
-        $this->assertStringContainsString('"Project Code","Project Name","Estimated Total","Actual Total",Variance,"Invoice Total","Balance Conciliation"', $csv);
-        $this->assertStringContainsString('BOL-SR-001', $csv);
-        $this->assertStringContainsString('555', $csv);
-        $this->assertStringContainsString('1110', $csv);
-
-        $this->assertDatabaseCount('invoices', 2);
-        $this->assertDatabaseHas('invoices', [
-            'id' => $matInvoice->id,
-            'type' => 'MAT',
-            'stage' => 'initial',
-            'status' => 'draft',
-        ]);
+        $reconciliation=new ReconciliationService();
+        $unpaid=$reconciliation->reconcile(new ReconciliationInput('0.00',$final->total,null,null,'0.00'));
+        self::assertSame('-583.00',$unpaid->incomeLessOperating);
+        self::assertNull($unpaid->operatingLessAccounting);
+        $paid=$reconciliation->reconcile(new ReconciliationInput('633.00',$final->total,'580.00',null,'0.00'));
+        self::assertSame('50.00',$paid->incomeLessOperating);
+        self::assertSame('3.00',$paid->operatingLessAccounting);
     }
 
-    /**
-     * @return array{project: Project, team: Team, contact: ContactPerson, drCategory: ExpenseCategory, wodrCategory: ExpenseCategory}
-     */
-    private function createBaseContext(User $user): array
+    public function test_mat_conserva_comision_y_contingencia_final_si_no_hay_override(): void
     {
-        SystemSetting::query()->create([
-            'primary_color' => '#2563eb',
-            'secondary_color' => '#0f766e',
-            'accent_color' => '#f59e0b',
-            'lock_final_invoice_by_default' => true,
-            'accounting_can_edit_summary' => false,
-            'updated_by_id' => $user->id,
-        ]);
-
-        $country = Country::query()->create([
-            'name' => 'Bolivia',
-            'description' => null,
-        ]);
-        $community = Community::query()->create([
-            'country_id' => $country->id,
-            'name' => 'Santa Rosa',
-            'description' => null,
-        ]);
-        $project = Project::query()->create([
-            'country_id' => $country->id,
-            'community_id' => $community->id,
-            'code' => 'BOL-SR-001',
-            'name' => 'Santa Rosa Water Project',
-            'started_on' => '2026-06-01',
-            'closed_on' => null,
-            'description' => null,
-        ]);
-        $chapterType = ChapterType::query()->create([
-            'name' => 'Professional',
-            'description' => null,
-        ]);
-        $chapter = Chapter::query()->create([
-            'chapter_type_id' => $chapterType->id,
-            'university_id' => null,
-            'name' => 'EWB Missouri S&T',
-            'description' => null,
-        ]);
-        $team = Team::query()->create([
-            'chapter_id' => $chapter->id,
-            'name' => 'Missouri Travel Team',
-            'description' => null,
-            'credit_balance' => 100,
-        ]);
-        $contact = ContactPerson::query()->create([
-            'full_name' => 'Billing Contact',
-            'email' => 'billing@example.com',
-            'phone' => '+1 555 0100',
-            'physical_address' => '123 Engineering Way',
-        ]);
-        $drCategory = ExpenseCategory::query()->create([
-            'name' => 'Lodging',
-            'description' => null,
-            'fund_type' => 'DR',
-            'applies_service_fee' => false,
-            'applies_contingency' => false,
-            'service_fee_percentage' => 0,
-        ]);
-        $wodrCategory = ExpenseCategory::query()->create([
-            'name' => 'Bank Fees',
-            'description' => null,
-            'fund_type' => 'WODR',
-            'applies_service_fee' => false,
-            'applies_contingency' => false,
-            'service_fee_percentage' => 0,
-        ]);
-
-        return [
-            'project' => $project,
-            'team' => $team,
-            'contact' => $contact,
-            'drCategory' => $drCategory,
-            'wodrCategory' => $wodrCategory,
-        ];
+        $mat=new MatInvoiceCalculator(new InvoiceTotalsFactory());
+        $lines=[new BudgetLineData(1,'materials','1000.00'),
+            new BudgetLineData(2,'transport','100.00')];
+        $initial=$mat->calculate(new CalculationInput('initial',$lines));
+        self::assertSame('1455.00',$initial->total);
+        $same=$mat->calculate(new CalculationInput('final',$lines,'80.00',null,$initial->total));
+        self::assertSame('1455.00',$same->total);
+        $adjusted=$mat->calculate(new CalculationInput('final',$lines,'80.00','0.00',$initial->total));
+        self::assertSame('1345.00',$adjusted->total);
     }
 }

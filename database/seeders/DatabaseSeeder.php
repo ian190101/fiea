@@ -9,7 +9,6 @@ use App\Models\EmailTemplate;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SystemSetting;
-use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -31,9 +30,13 @@ class DatabaseSeeder extends Seeder
             ['code' => 'administrativo', 'name' => 'Administrativo'],
             ['code' => 'tecnico', 'name' => 'Tecnico'],
             ['code' => 'contabilidad', 'name' => 'Contabilidad'],
+            ['code' => 'capitulo', 'name' => 'Capítulo'],
         ])->map(fn (array $role) => Role::query()->firstOrCreate(['code' => $role['code']], $role));
 
         $roles->firstWhere('code', 'superadmin')?->permissions()->sync($permissions->pluck('id'));
+        if (is_string(config('superadmin.password')) && config('superadmin.password') !== '') {
+            $this->call(SuperadminSeeder::class);
+        }
         $roles->firstWhere('code', 'administrativo')?->permissions()->sync(
             $permissions->whereIn('code', [
                 'catalogs.view', 'catalogs.manage',
@@ -49,6 +52,9 @@ class DatabaseSeeder extends Seeder
                 'reports.view',
                 'alerts.view',
                 'audit_logs.view',
+                'dashboard.view', 'invoices.approve', 'invoices.void',
+                'payments.manage', 'credits.manage',
+                'billing_cases.transition', 'billing_cases.adjust_closed',
             ])->pluck('id')
         );
         $roles->firstWhere('code', 'tecnico')?->permissions()->sync(
@@ -60,6 +66,7 @@ class DatabaseSeeder extends Seeder
                 'receipts.view', 'receipts.manage',
                 'invoices.view',
                 'alerts.view',
+                'dashboard.view',
             ])->pluck('id')
         );
         $roles->firstWhere('code', 'contabilidad')?->permissions()->sync(
@@ -71,22 +78,12 @@ class DatabaseSeeder extends Seeder
                 'reports.view',
                 'alerts.view',
                 'audit_logs.view',
+                'dashboard.view', 'payments.manage', 'credits.manage',
             ])->pluck('id')
         );
-
-        $user = User::query()->updateOrCreate(
-            ['username' => 'admin'],
-            [
-                'name' => 'Administrador FIEA',
-                'email' => 'admin@fiea.local',
-                'password' => 'password',
-                'must_change_password' => false,
-                'theme_preference' => 'system',
-                'is_active' => true,
-            ]
+        $roles->firstWhere('code', 'capitulo')?->permissions()->sync(
+            $permissions->whereIn('code', ['dashboard.view', 'invoices.view'])->pluck('id')
         );
-
-        $user->roles()->sync($roles->pluck('id'));
 
         ChapterType::query()->firstOrCreate(['name' => 'Universitario']);
         ChapterType::query()->firstOrCreate(['name' => 'Profesional']);
@@ -99,13 +96,14 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Food', 'fund_type' => 'DR'],
             ['name' => 'Materials', 'fund_type' => 'DR'],
             ['name' => 'Bank Fees', 'fund_type' => 'WODR'],
-            ['name' => 'Contingency', 'fund_type' => 'WODR', 'applies_contingency' => true],
+            ['name' => 'Contingency', 'fund_type' => 'DR', 'applies_contingency' => true],
         ])->each(fn (array $category) => ExpenseCategory::query()->firstOrCreate(
             ['name' => $category['name']],
             $category
         ));
 
         SystemSetting::query()->firstOrCreate(['id' => 1]);
+        $this->call(FinancialCatalogSeeder::class);
         $this->seedEmailTemplates();
     }
 
@@ -115,6 +113,14 @@ class DatabaseSeeder extends Seeder
     private function permissions(): array
     {
         return [
+            ['code' => 'dashboard.view', 'module' => 'dashboard', 'name' => 'Ver panel'],
+            ['code' => 'invoices.approve', 'module' => 'invoices', 'name' => 'Aprobar invoices'],
+            ['code' => 'invoices.void', 'module' => 'invoices', 'name' => 'Anular invoices'],
+            ['code' => 'scope.manage', 'module' => 'scope', 'name' => 'Gestionar jurisdicción'],
+            ['code' => 'payments.manage', 'module' => 'payments', 'name' => 'Gestionar pagos'],
+            ['code' => 'credits.manage', 'module' => 'credits', 'name' => 'Gestionar créditos'],
+            ['code' => 'billing_cases.transition', 'module' => 'billing_cases', 'name' => 'Cambiar estado de expedientes'],
+            ['code' => 'billing_cases.adjust_closed', 'module' => 'billing_cases', 'name' => 'Ajustar expedientes cerrados'],
             ['code' => 'catalogs.view', 'module' => 'catalogs', 'name' => 'Ver catalogos'],
             ['code' => 'catalogs.manage', 'module' => 'catalogs', 'name' => 'Gestionar catalogos'],
             ['code' => 'chapters.view', 'module' => 'chapters', 'name' => 'Ver capitulos'],

@@ -1,13 +1,19 @@
+import { useOptionCollection } from '@/Utils/useOptionCollection';
+import CursorPager from '@/Components/CursorPager';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import IconButton from '@/Components/IconButton';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TableControls from '@/Components/TableControls';
 import TextInput from '@/Components/TextInput';
+import EmptyState from '@/Components/EmptyState';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useLocalTable } from '@/Utils/useLocalTable';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useCallback, useMemo, useState } from 'react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const statusLabels = {
     draft: 'Borrador',
@@ -17,10 +23,15 @@ const statusLabels = {
     cancelled: 'Cancelado',
 };
 
-export default function TripPhaseIndex({ tripPhases = [], projects = [], teams = [], technicians = [], phaseOptions = [], statusOptions = [] }) {
+export default function TripPhaseIndex({ tripPhases: phasePage = [], projects: initialprojects = [], teams: initialteams = [], technicians: initialtechnicians = [], phaseOptions = [], statusOptions = [], selected_id = null }) {
+    const projects = useOptionCollection(initialprojects, 'projects');
+    const teams = useOptionCollection(initialteams, 'teams');
+    const technicians = useOptionCollection(initialtechnicians, 'technicians');
+    const tripPhases = Array.isArray(phasePage) ? phasePage : (phasePage?.data ?? []);
     const { flash } = usePage().props;
     const [editingPhase, setEditingPhase] = useState(null);
     const [projectFilter, setProjectFilter] = useState('');
+    const selectedIdHandled = useRef(null);
 
     const form = useForm({
         project_id: projects[0]?.id ?? '',
@@ -32,7 +43,11 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
         volunteer_count: 0,
         staff_count: 0,
         status: 'draft',
+        version: 1,
     });
+    const guard = useUnsavedChangesGuard(form.isDirty);
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [deleteBusy, setDeleteBusy] = useState(false);
 
     const visiblePhases = useMemo(() => {
         if (!projectFilter) {
@@ -87,13 +102,21 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
             volunteer_count: phase.volunteer_count ?? 0,
             staff_count: phase.staff_count ?? 0,
             status: phase.status ?? 'draft',
+            version: phase.version,
         });
     };
+
+    useEffect(() => {
+        if (selected_id === null || selectedIdHandled.current === selected_id || tripPhases.length === 0) return;
+        selectedIdHandled.current = selected_id;
+        const selected = tripPhases.find((phase) => String(phase.id) === String(selected_id));
+        if (selected) edit(selected);
+    }, [selected_id, tripPhases]);
 
     const resetForm = () => {
         setEditingPhase(null);
         form.clearErrors();
-        form.setData({
+        const next = {
             project_id: projects[0]?.id ?? '',
             team_id: teams[0]?.id ?? '',
             assigned_technician_id: '',
@@ -103,21 +126,23 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
             volunteer_count: 0,
             staff_count: 0,
             status: 'draft',
-        });
+            version: 1,
+        };
+        form.setData(next);
+        form.setDefaults(next);
     };
 
-    const destroy = (phase) => {
-        if (!window.confirm(`Eliminar "${phase.phase}" de "${phase.project?.code}"?`)) {
-            return;
-        }
-
-        router.delete(route('trip-phases.destroy', phase.id), {
+    const destroy = (phase) => guard.request(() => setPendingDelete(phase));
+    const confirmDelete = () => {
+        if (!pendingDelete || deleteBusy) return;
+        setDeleteBusy(true);
+        router.delete(route('trip-phases.destroy', pendingDelete.id), {
+            data: { version: pendingDelete.version },
             preserveScroll: true,
             onSuccess: () => {
-                if (editingPhase?.id === phase.id) {
-                    resetForm();
-                }
+                if (editingPhase?.id === pendingDelete.id) resetForm();
             },
+            onFinish: () => { setDeleteBusy(false); setPendingDelete(null); },
         });
     };
 
@@ -138,6 +163,8 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
 
             <div className="max-w-7xl space-y-6">
                 <FlashMessages flash={flash} />
+                <CursorPager page={phasePage} label="viajes" />
+
 
                 <div className="grid gap-4 md:grid-cols-3">
                     <MetricCard label="Fases" value={summary.phases} />
@@ -261,9 +288,12 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
                                     <h2 className="text-xl font-black">Fases registradas</h2>
                                     <p className="text-sm text-app-muted">{visiblePhases.length} de {tripPhases.length} fases</p>
                                 </div>
-                                <select
+                                <LiquidSelect
                                     value={projectFilter}
-                                    onChange={(event) => setProjectFilter(event.target.value)}
+                                    onChange={(event) => {
+                                        const value = event.target.value;
+                                        guard.request(() => setProjectFilter(value));
+                                    }}
                                     className="ios-field text-sm font-bold"
                                 >
                                     <option value="">Todos los proyectos</option>
@@ -272,7 +302,7 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
                                             {project.code} - {project.name}
                                         </option>
                                     ))}
-                                </select>
+                                </LiquidSelect>
                             </div>
                             <TableControls
                                 query={table.query}
@@ -290,6 +320,7 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
 
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
+                                <caption className="sr-only">Fases de viaje y acciones disponibles</caption>
                                 <thead>
                                     <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
                                         <th className="px-5 py-4">Proyecto</th>
@@ -326,6 +357,7 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
                                             </td>
                                             <td className="px-5 py-4">
                                                 <div className="flex justify-end gap-2">
+                                                    <Link href={`/trip-phases/${phase.id}/budget?view=draft&invoice_type=IC&stage=initial`} className="glass-button px-3">Matriz diaria</Link>
                                                     <IconButton icon="edit" label="Editar fase" type="button" onClick={() => edit(phase)} />
                                                     <IconButton icon="trash" label="Eliminar fase" type="button" variant="danger" onClick={() => destroy(phase)} />
                                                 </div>
@@ -334,8 +366,8 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
                                     ))}
                                     {table.filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan="7" className="px-5 py-10 text-center text-sm font-semibold text-app-muted">
-                                                Aun no hay fases de viaje para este filtro.
+                                            <td colSpan="7" className="px-5 py-10">
+                                                <EmptyState title={tripPhases.length ? 'Sin resultados para estos filtros' : 'Aún no hay fases'} description={tripPhases.length ? 'Cambia los filtros para ver otras fases.' : 'Crea una fase de viaje para comenzar.'} />
                                             </td>
                                         </tr>
                                     )}
@@ -345,6 +377,10 @@ export default function TripPhaseIndex({ tripPhases = [], projects = [], teams =
                     </div>
                 </section>
             </div>
+            <FinancialActionSheet open={Boolean(pendingDelete)} busy={deleteBusy} title="Eliminar registro"
+                description={pendingDelete ? `Se eliminará «${pendingDelete.phase}». Confirma solo si corresponde a un borrador.` : ''}
+                confirmLabel="Eliminar" onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} />
+            <FinancialActionSheet {...guard.dialogProps} />
         </AuthenticatedLayout>
     );
 }
@@ -385,7 +421,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -397,7 +433,7 @@ function SelectField({ id, label, value, options, error, onChange, emptyLabel = 
                         {option.name}
                     </option>
                 ))}
-            </select>
+            </LiquidSelect>
             <InputError message={error} className="mt-2" />
         </div>
     );

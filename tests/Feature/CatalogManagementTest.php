@@ -7,11 +7,13 @@ use App\Models\ExpenseCategory;
 use App\Models\University;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class CatalogManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_catalogs(): void
     {
@@ -21,7 +23,7 @@ class CatalogManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_catalogs(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['catalogs.view', 'catalogs.manage']);
 
         $this->actingAs($user)
             ->get('/catalogos')
@@ -30,7 +32,7 @@ class CatalogManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_countries(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['catalogs.view', 'catalogs.manage']);
 
         $this->actingAs($user)
             ->post(route('catalogs.store', 'countries'), [
@@ -48,7 +50,7 @@ class CatalogManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_communities_for_a_country(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['catalogs.view', 'catalogs.manage']);
         $country = Country::query()->create([
             'name' => 'Bolivia',
             'description' => null,
@@ -71,7 +73,7 @@ class CatalogManagementTest extends TestCase
 
     public function test_authenticated_users_can_update_universities(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['catalogs.view', 'catalogs.manage']);
         $university = University::query()->create(['name' => 'Missouri ST']);
 
         $this->actingAs($user)
@@ -89,7 +91,7 @@ class CatalogManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_expense_categories(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['catalogs.view', 'catalogs.manage']);
 
         $this->actingAs($user)
             ->post(route('catalogs.store', 'expense-categories'), [
@@ -98,7 +100,7 @@ class CatalogManagementTest extends TestCase
                 'fund_type' => 'DR',
                 'applies_service_fee' => true,
                 'applies_contingency' => false,
-                'service_fee_percentage' => 5,
+                'service_fee_percentage' => '5.0000',
             ])
             ->assertSessionHasNoErrors()
             ->assertRedirect();
@@ -113,7 +115,7 @@ class CatalogManagementTest extends TestCase
 
     public function test_authenticated_users_can_delete_unused_universities(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['catalogs.view', 'catalogs.manage']);
         $university = University::query()->create(['name' => 'Temporary University']);
 
         $this->actingAs($user)
@@ -128,7 +130,7 @@ class CatalogManagementTest extends TestCase
 
     public function test_duplicate_expense_category_names_are_rejected(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['catalogs.view', 'catalogs.manage']);
         ExpenseCategory::query()->create([
             'name' => 'Meals',
             'description' => null,

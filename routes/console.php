@@ -15,3 +15,5 @@ Schedule::command('fiea:email-automation')
 Schedule::command('fiea:backup-database')
     ->dailyAt('02:00')
     ->withoutOverlapping();
+
+Schedule::command('fiea:dispatch-outbox')->everyMinute()->withoutOverlapping();

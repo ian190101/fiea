@@ -6,11 +6,13 @@ use App\Models\AuditLog;
 use App\Models\Invoice;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class AuditLogManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_audit_logs(): void
     {
@@ -20,7 +22,7 @@ class AuditLogManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_audit_logs(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['audit_logs.view']);
 
         $this->actingAs($user)
             ->get('/auditoria')
@@ -29,8 +31,8 @@ class AuditLogManagementTest extends TestCase
 
     public function test_audit_logs_can_be_filtered_by_module_action_and_user(): void
     {
-        $user = User::factory()->create();
-        $otherUser = User::factory()->create();
+        $user = $this->authorizedUser(['audit_logs.view']);
+        $otherUser = $this->authorizedUser(['audit_logs.view']);
 
         AuditLog::query()->create([
             'user_id' => $user->id,
@@ -66,7 +68,7 @@ class AuditLogManagementTest extends TestCase
 
     public function test_audit_log_filter_validation_rejects_too_long_values(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['audit_logs.view']);
 
         $this->actingAs($user)
             ->get(route('audit-logs.index', [

@@ -1,3 +1,7 @@
+import InputLabel from '@/Components/InputLabel';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import LiquidDateInput from '@/Components/Glass/LiquidDateInput';
+import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
 import { SvgIcon } from '@/Components/IconButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -11,11 +15,10 @@ const invoiceLabels = {
     void: 'Anulado',
 };
 
-export default function ReportIndex({ filters = {}, projects = [], summary = {}, byProject = [], byFund = [], invoiceStatus = [], receiptCoverage = {} }) {
+export default function ReportIndex({ filters = {}, summary = {}, byProject = [], byFund = [], creditAccounts = [], nextCursor = null }) {
     const [form, setForm] = useState({
-        start_date: filters.start_date ?? '',
-        end_date: filters.end_date ?? '',
-        project_id: filters.project_id ?? '',
+        year: filters.year ?? new Date().getFullYear(),
+        basis: filters.basis ?? 'case_lifetime',
     });
 
     const exportParams = useMemo(() => cleanParams(form), [form]);
@@ -29,7 +32,7 @@ export default function ReportIndex({ filters = {}, projects = [], summary = {},
     };
 
     const clearFilters = () => {
-        setForm({ start_date: '', end_date: '', project_id: '' });
+        setForm({ year: new Date().getFullYear(), basis: 'case_lifetime' });
         router.get(route('reports.index'), {}, {
             preserveScroll: true,
             preserveState: true,
@@ -48,32 +51,23 @@ export default function ReportIndex({ filters = {}, projects = [], summary = {},
             <Head title="Reportes" />
 
             <div className="max-w-7xl space-y-6 pb-12">
+                <Link href="/accounting/control" className="glass-button px-4">Ver control anual consolidado</Link>
                 <form onSubmit={applyFilters} className="glass-panel rounded-[2rem] p-5">
-                    <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.3fr_auto] lg:items-end">
-                        <DateField
-                            label="Desde"
-                            value={form.start_date}
-                            onChange={(value) => setForm((current) => ({ ...current, start_date: value }))}
-                        />
-                        <DateField
-                            label="Hasta"
-                            value={form.end_date}
-                            onChange={(value) => setForm((current) => ({ ...current, end_date: value }))}
-                        />
+                    <div className="grid gap-4 md:grid-cols-[1fr_1.3fr_auto] md:items-end">
                         <div>
-                            <label className="text-sm font-bold text-app-muted">Proyecto</label>
-                            <select
-                                value={form.project_id}
-                                onChange={(event) => setForm((current) => ({ ...current, project_id: event.target.value }))}
-                                className="ios-field mt-1 block w-full"
-                            >
-                                <option value="">Todos los proyectos</option>
-                                {projects.map((project) => (
-                                    <option key={project.id} value={project.id}>
-                                        {project.code} - {project.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <InputLabel htmlFor="report-year" className="text-sm font-bold text-app-muted">Año</InputLabel>
+                            <input id="report-year" type="number" min="2000" max="2100" value={form.year}
+                                onChange={(event) => setForm((current) => ({ ...current, year: event.target.value }))}
+                                className="ios-field mt-1 block w-full" />
+                        </div>
+                        <div>
+                            <InputLabel htmlFor="report-basis" className="text-sm font-bold text-app-muted">Base de cálculo</InputLabel>
+                            <LiquidSelect id="report-basis" value={form.basis}
+                                onChange={(event) => setForm((current) => ({ ...current, basis: event.target.value }))}
+                                className="ios-field mt-1 block w-full">
+                                <option value="case_lifetime">Vida del expediente</option>
+                                <option value="period_cash">Cobros del año</option>
+                            </LiquidSelect>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             <button type="submit" className="glass-button gap-2">
@@ -83,24 +77,24 @@ export default function ReportIndex({ filters = {}, projects = [], summary = {},
                             <button type="button" className="glass-button" onClick={clearFilters}>
                                 Limpiar
                             </button>
-                            <Link href={route('reports.export', exportParams)} className="glass-button gap-2">
+                            <a href={route('reports.export', exportParams)} className="glass-button gap-2">
                                 <SvgIcon name="download" />
                                 <span>CSV</span>
-                            </Link>
+                            </a>
                         </div>
                     </div>
                 </form>
 
                 <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard label="Estimado" value={formatMoney(summary.estimated_total)} tone="primary" />
-                    <MetricCard label="Real" value={formatMoney(summary.actual_total)} tone="secondary" />
-                    <MetricCard label="Variacion" value={formatMoney(summary.variance)} tone={Number(summary.variance ?? 0) > 0 ? 'danger' : 'secondary'} />
-                    <MetricCard label="Balance" value={formatMoney(summary.balance_conciliation)} tone="accent" />
+                    <MetricCard label="Ingreso confirmado" value={formatMoney(summary.income)} tone="primary" />
+                    <MetricCard label="Gasto Final" value={formatMoney(summary.operating_total)} tone="secondary" />
+                    <MetricCard label="Diferencia" value={formatMoney(summary.difference)} tone={moneySign(summary.difference) === -1 ? 'danger' : 'secondary'} />
+                    <MetricCard label="Crédito disponible" value={formatMoney(summary.credit)} tone="accent" />
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-[1fr_0.85fr]">
                     <div className="glass-panel rounded-[2rem] p-5">
-                        <h2 className="text-xl font-black">Presupuesto vs real por fondo</h2>
+                        <h2 className="text-xl font-black">Gasto Final por fondo</h2>
                         <div className="mt-5 space-y-5">
                             {byFund.map((row) => (
                                 <FundComparison key={row.fund_type} row={row} />
@@ -109,11 +103,11 @@ export default function ReportIndex({ filters = {}, projects = [], summary = {},
                     </div>
 
                     <div className="glass-panel rounded-[2rem] p-5">
-                        <h2 className="text-xl font-black">Cobertura de comprobantes</h2>
-                        <p className="mt-1 text-sm text-app-muted">Gastos reales con y sin recibo asociado</p>
-                        <div className="mt-6">
-                            <CoverageChart coverage={receiptCoverage} />
-                        </div>
+                        <h2 className="text-xl font-black">Alcance del reporte</h2>
+                        <p className="mt-3 text-sm text-app-muted">Los importes agrupan los expedientes del año y la base de cálculo seleccionados. Los valores pendientes se muestran como tales.</p>
+                        <p className="mt-3 text-sm font-semibold">Expedientes: {summary.case_count ?? 0} · Grupos pendientes: {summary.pending_groups ?? 0}</p>
+                        <p className="mt-3 text-sm text-app-muted">El crédito pertenece a la cuenta del equipo y no se distribuye entre proyectos. En CSV aparece una vez por cuenta.</p>
+                        {creditAccounts.map(account => <p key={account.id} className="text-sm">Cuenta {account.id} · Equipo {account.team_id}: {formatMoney(account.balance)}</p>)}
                     </div>
                 </section>
 
@@ -121,32 +115,32 @@ export default function ReportIndex({ filters = {}, projects = [], summary = {},
                     <div className="glass-panel overflow-hidden rounded-[2rem]">
                         <div className="border-b border-white/30 px-5 py-5 dark:border-white/10">
                             <h2 className="text-xl font-black">Resultado por proyecto</h2>
-                            <p className="text-sm text-app-muted">{byProject.length} proyectos con movimiento</p>
+                            <p className="text-sm text-app-muted">{byProject.length} grupos con movimiento</p>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-white/30 dark:divide-white/10">
                                 <thead>
                                     <tr className="text-left text-xs font-black uppercase tracking-wide text-app-muted">
-                                        <th className="px-5 py-4">Proyecto</th>
-                                        <th className="px-5 py-4 text-right">Estimado</th>
-                                        <th className="px-5 py-4 text-right">Real</th>
-                                        <th className="px-5 py-4 text-right">Variacion</th>
-                                        <th className="px-5 py-4 text-right">Invoices</th>
+                                        <th className="px-5 py-4">Proyecto / equipo</th>
+                                        <th className="px-5 py-4 text-right">Ingreso</th>
+                                        <th className="px-5 py-4 text-right">Gasto Final</th>
+                                        <th className="px-5 py-4 text-right">Diferencia</th>
+                                        <th className="px-5 py-4 text-right">Cuenta de crédito compartida</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/25 dark:divide-white/10">
                                     {byProject.map((row) => (
-                                        <tr key={row.project_id} className="text-sm">
+                                        <tr key={row.group_key} className="text-sm">
                                             <td className="px-5 py-4">
-                                                <div className="font-black">{row.project_code}</div>
-                                                <div className="text-xs text-app-muted">{row.project_name}</div>
+                                                <div className="font-black">Proyecto {row.project_id}</div>
+                                                <div className="text-xs text-app-muted">Equipo {row.team_id}</div>
                                             </td>
-                                            <td className="px-5 py-4 text-right">{formatMoney(row.estimated_total)}</td>
-                                            <td className="px-5 py-4 text-right">{formatMoney(row.actual_total)}</td>
-                                            <td className={`px-5 py-4 text-right font-black ${Number(row.variance) > 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-200'}`}>
-                                                {formatMoney(row.variance)}
+                                            <td className="px-5 py-4 text-right">{formatMoney(row.income)}</td>
+                                            <td className="px-5 py-4 text-right">{formatMoney(row.operating_total)}</td>
+                                            <td className={`px-5 py-4 text-right font-black ${moneySign(row.difference) === -1 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-200'}`}>
+                                                {formatMoney(row.difference)}
                                             </td>
-                                            <td className="px-5 py-4 text-right">{formatMoney(row.invoice_total)}</td>
+                                            <td className="px-5 py-4 text-right">{row.credit_account_id ? `Cuenta ${row.credit_account_id}` : 'Sin cuenta'}</td>
                                         </tr>
                                     ))}
                                     {byProject.length === 0 && (
@@ -162,14 +156,10 @@ export default function ReportIndex({ filters = {}, projects = [], summary = {},
                     </div>
 
                     <div className="glass-panel rounded-[2rem] p-5">
-                        <h2 className="text-xl font-black">Invoices por estado</h2>
+                        <h2 className="text-xl font-black">Detalle del cálculo</h2>
                         <div className="mt-5 space-y-4">
-                            {invoiceStatus.map((row) => (
-                                <InvoiceStatusRow key={row.status} row={row} />
-                            ))}
-                            {invoiceStatus.length === 0 && (
-                                <p className="text-sm font-semibold text-app-muted">Sin invoices para estos filtros.</p>
-                            )}
+                            <p className="text-sm text-app-muted">{form.basis === 'period_cash' ? 'Se incluyen cobros registrados en el año seleccionado.' : 'Se incluyen expedientes vinculados al año seleccionado.'}</p>
+                            <p className="text-sm text-app-muted">Para revisar cada expediente, abre el control anual consolidado.</p>
                         </div>
                     </div>
                 </section>
@@ -181,9 +171,8 @@ export default function ReportIndex({ filters = {}, projects = [], summary = {},
 function DateField({ label, value, onChange }) {
     return (
         <div>
-            <label className="text-sm font-bold text-app-muted">{label}</label>
-            <input
-                type="date"
+            <InputLabel className="text-sm font-bold text-app-muted">{label}</InputLabel>
+            <LiquidDateInput
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 className="ios-field mt-1 block w-full"
@@ -210,20 +199,10 @@ function MetricCard({ label, value, tone }) {
 }
 
 function FundComparison({ row }) {
-    const max = Math.max(Number(row.estimated_total ?? 0), Number(row.actual_total ?? 0), 1);
-
-    return (
-        <div className="glass-tile p-4">
-            <div className="mb-3 flex justify-between gap-4">
-                <h3 className="font-black">{row.fund_type}</h3>
-                <span className={`text-sm font-black ${Number(row.variance) > 0 ? 'text-red-600 dark:text-red-300' : 'text-emerald-700 dark:text-emerald-200'}`}>
-                    {formatMoney(row.variance)}
-                </span>
-            </div>
-            <Bar label="Estimado" value={formatMoney(row.estimated_total)} width={(Number(row.estimated_total ?? 0) / max) * 100} className="bg-brand-primary" />
-            <Bar label="Real" value={formatMoney(row.actual_total)} width={(Number(row.actual_total ?? 0) / max) * 100} className="bg-brand-secondary" />
-        </div>
-    );
+    return <div className="glass-tile p-4">
+        <h3 className="font-black">{row.fund_type}</h3>
+        <p className="money mt-3 text-lg font-semibold">{formatMoney(row.actual_total)}</p>
+    </div>;
 }
 
 function Bar({ label, value, width, className }) {
@@ -271,11 +250,4 @@ function InvoiceStatusRow({ row }) {
 
 function cleanParams(form) {
     return Object.fromEntries(Object.entries(form).filter(([, value]) => value !== '' && value !== null && value !== undefined));
-}
-
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
 }

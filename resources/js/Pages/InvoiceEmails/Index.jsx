@@ -1,19 +1,25 @@
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
 import IconButton from '@/Components/IconButton';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
+import CursorPager from '@/Components/CursorPager';
+import TemplateFieldEditor from '@/Components/TemplateFieldEditor';
+import { readableTemplate, sampleTemplate } from '@/Utils/templateFields';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const recipientTypes = [
-    { id: 'to', name: 'TO' },
-    { id: 'cc', name: 'CC' },
-    { id: 'bcc', name: 'BCC' },
+    { id: 'to', name: 'Para' },
+    { id: 'cc', name: 'Con copia' },
+    { id: 'bcc', name: 'Con copia oculta' },
 ];
 
-export default function InvoiceEmailIndex({ invoices = [], defaultMessages = {}, templates = [], templateTokens = [], contacts = [], recommendedRecipients = {}, emailLogs = { data: [] }, automationSummary = {} }) {
+export default function InvoiceEmailIndex({ invoices: invoicePage = [], defaultMessages = {}, templates = [], templateTokens = [], contacts = [], recommendedRecipients = {}, emailLogs = { data: [] }, automationSummary = {} }) {
+    const invoices = Array.isArray(invoicePage) ? invoicePage : (invoicePage?.data ?? []);
     const { flash } = usePage().props;
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id ?? '');
     const [manualEmail, setManualEmail] = useState('');
@@ -50,6 +56,9 @@ export default function InvoiceEmailIndex({ invoices = [], defaultMessages = {},
             recipients: invoice ? initialRecipients(invoice, recommendedRecipients) : [],
         });
     };
+    useEffect(() => {
+        if (!selectedInvoiceId && invoices.length) changeInvoice(invoices[0].id);
+    }, [invoices, selectedInvoiceId]);
 
     const startTemplateEdit = (template) => {
         setEditingTemplate(template);
@@ -185,6 +194,7 @@ export default function InvoiceEmailIndex({ invoices = [], defaultMessages = {},
                                 emptyLabel="Seleccionar invoice"
                                 onChange={changeInvoice}
                             />
+                            <CursorPager page={invoicePage} label="invoices para correo" />
 
                             <TextField
                                 id="subject"
@@ -237,7 +247,7 @@ export default function InvoiceEmailIndex({ invoices = [], defaultMessages = {},
                                     placeholder="manual@example.com"
                                     className="block w-full"
                                 />
-                                <select
+                                <LiquidSelect
                                     value={manualType}
                                     onChange={(event) => setManualType(event.target.value)}
                                     className="rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
@@ -245,7 +255,7 @@ export default function InvoiceEmailIndex({ invoices = [], defaultMessages = {},
                                     {recipientTypes.map((type) => (
                                         <option key={type.id} value={type.id}>{type.name}</option>
                                     ))}
-                                </select>
+                                </LiquidSelect>
                             </div>
                             <button type="button" className="glass-button w-full px-4 py-2" onClick={addManualRecipient}>
                                 Agregar email manual
@@ -439,7 +449,7 @@ function TemplatePanel({ templates, templateTokens, form, editingTemplate, onEdi
                                 Editar
                             </button>
                         </div>
-                        <p className="mt-2 truncate text-xs font-semibold text-app-muted">{template.subject_template}</p>
+                        <p className="mt-2 truncate text-xs font-semibold text-app-muted">{readableTemplate(template.subject_template)}</p>
                         {!template.is_active && (
                             <span className="mt-2 inline-flex rounded-full bg-amber-400/20 px-3 py-1 text-xs font-black text-amber-800 dark:text-amber-100">
                                 Inactiva
@@ -485,7 +495,7 @@ function TemplatePanel({ templates, templateTokens, form, editingTemplate, onEdi
                         label="Etapa"
                         value={form.data.stage}
                         options={[
-                            { id: 'initial', name: 'Initial' },
+                            { id: 'initial', name: 'Inicial' },
                             { id: 'final', name: 'Final' },
                         ]}
                         onChange={(value) => form.setData('stage', value)}
@@ -493,30 +503,21 @@ function TemplatePanel({ templates, templateTokens, form, editingTemplate, onEdi
                 </div>
                 <InputError message={form.errors.stage} className="mt-2" />
 
-                <TextField
+                <TemplateFieldEditor
                     id="subject_template"
-                    label="Subject template"
+                    label="Asunto del correo"
+                    tokens={templateTokens}
                     value={form.data.subject_template}
                     error={form.errors.subject_template}
                     onChange={(value) => form.setData('subject_template', value)}
                 />
 
-                <div>
-                    <InputLabel htmlFor="body_template" value="Body template" />
-                    <textarea
-                        id="body_template"
-                        rows="8"
-                        value={form.data.body_template}
-                        onChange={(event) => form.setData('body_template', event.target.value)}
-                        className="mt-1 block w-full rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
-                    />
-                    <InputError message={form.errors.body_template} className="mt-2" />
-                </div>
+                <TemplateFieldEditor id="body_template" label="Mensaje del correo" multiline value={form.data.body_template} onChange={(value) => form.setData('body_template', value)} tokens={templateTokens} error={form.errors.body_template} />
 
                 <label className="flex items-center justify-between gap-4 rounded-2xl bg-white/30 p-4 dark:bg-white/10">
                     <span>
                         <span className="block font-black">Activa</span>
-                        <span className="text-sm text-app-muted">Si esta apagada, se usa una plantilla fallback.</span>
+                        <span className="text-sm text-app-muted">Si está desactivada, se utiliza el mensaje predeterminado.</span>
                     </span>
                     <input
                         type="checkbox"
@@ -527,14 +528,10 @@ function TemplatePanel({ templates, templateTokens, form, editingTemplate, onEdi
                 </label>
 
                 <div className="rounded-2xl bg-white/30 p-4 text-xs font-bold text-app-muted dark:bg-white/10">
-                    <p className="mb-2 uppercase">Tokens disponibles</p>
-                    <div className="flex flex-wrap gap-2">
-                        {Object.entries(templateTokens).map(([token, label]) => (
-                            <span key={token} title={label} className="rounded-full bg-white/40 px-3 py-1 dark:bg-white/10">
-                                {token}
-                            </span>
-                        ))}
-                    </div>
+                    <p className="mb-2 uppercase">Vista previa del correo</p>
+                    <p className="mb-3 font-normal">Ejemplo con datos ficticios. Los datos reales se completan al preparar cada envío.</p>
+                    <p className="font-semibold">{sampleTemplate(form.data.subject_template, { invoiceType: form.data.invoice_type, stage: form.data.stage })}</p>
+                    <p className="mt-3 whitespace-pre-wrap font-normal">{sampleTemplate(form.data.body_template, { invoiceType: form.data.invoice_type, stage: form.data.stage })}</p>
                 </div>
 
                 <PrimaryButton disabled={form.processing}>
@@ -570,7 +567,7 @@ function SelectField({ id, label, value, options, emptyLabel, onChange }) {
     return (
         <div>
             <InputLabel htmlFor={id} value={label} />
-            <select
+            <LiquidSelect
                 id={id}
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
@@ -580,7 +577,7 @@ function SelectField({ id, label, value, options, emptyLabel, onChange }) {
                 {options.map((option) => (
                     <option key={option.id} value={option.id}>{option.name}</option>
                 ))}
-            </select>
+            </LiquidSelect>
         </div>
     );
 }
@@ -657,15 +654,9 @@ function invoiceLabel(invoice) {
 }
 
 function stageLabel(stage) {
-    return stage === 'final' ? 'Final' : 'Initial';
+    return stage === 'final' ? 'Final' : 'Inicial';
 }
 
-function formatMoney(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(Number(value ?? 0));
-}
 
 function formatDate(value) {
     if (!value) {

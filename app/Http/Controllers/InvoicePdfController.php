@@ -13,6 +13,7 @@ class InvoicePdfController extends Controller
 {
     public function store(Invoice $invoice, InvoicePdfService $service): RedirectResponse
     {
+        request()->user()->can('update', $invoice) || abort(404);
         $service->generate($invoice, request()->user());
 
         return back()->with('success', 'PDF de invoice generado correctamente.');
@@ -20,6 +21,7 @@ class InvoicePdfController extends Controller
 
     public function show(Invoice $invoice): StreamedResponse
     {
+        request()->user()->can('view', $invoice) || abort(404);
         $invoice->load('pdfFile');
         abort_unless($invoice->pdfFile instanceof StorageFile, 404);
 

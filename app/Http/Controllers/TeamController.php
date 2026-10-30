@@ -2,30 +2,36 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Chapters\SaveTeam;
+use App\Http\Requests\SaveTeamRequest;
 use App\Models\Team;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class TeamController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    public function store(SaveTeamRequest $request, SaveTeam $action): RedirectResponse
     {
-        Team::query()->create($this->validatedData($request));
+        $action->execute($request->user(), null, $request->validated());
 
         return back()->with('success', 'Equipo creado correctamente.');
     }
 
-    public function update(Request $request, Team $team): RedirectResponse
+    public function update(SaveTeamRequest $request, Team $team, SaveTeam $action): RedirectResponse
     {
-        $team->fill($this->validatedData($request, $team->id))->save();
+        $action->execute($request->user(), $team, $request->validated());
 
         return back()->with('success', 'Equipo actualizado correctamente.');
     }
 
     public function destroy(Team $team): RedirectResponse
     {
+        $this->authorizeChapter(request(), (int) $team->chapter_id);
+        if ($team->contactAssignments()->exists()) {
+            return back()->withErrors(['team' => 'El equipo tiene asignaciones de contacto; desvincúlalas antes de eliminarlo.']);
+        }
         try {
             $team->delete();
         } catch (QueryException) {
@@ -37,23 +43,9 @@ class TeamController extends Controller
         return back()->with('success', 'Equipo eliminado correctamente.');
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function validatedData(Request $request, ?int $id = null): array
+    private function authorizeChapter(Request $request, int $chapterId): void
     {
-        return $request->validate([
-            'chapter_id' => ['required', 'integer', Rule::exists('chapters', 'id')],
-            'name' => [
-                'required',
-                'string',
-                'max:160',
-                Rule::unique('teams', 'name')
-                    ->where('chapter_id', $request->integer('chapter_id'))
-                    ->ignore($id),
-            ],
-            'description' => ['nullable', 'string', 'max:255'],
-            'credit_balance' => ['required', 'numeric', 'min:-999999999.99', 'max:999999999.99'],
-        ]);
+        abort_unless($request->user()->scope_all || DB::table('user_chapter_assignments')
+            ->where('user_id', $request->user()->id)->where('chapter_id', $chapterId)->exists(), 404);
     }
 }

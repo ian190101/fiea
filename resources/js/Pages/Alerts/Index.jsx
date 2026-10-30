@@ -1,3 +1,5 @@
+import InputLabel from '@/Components/InputLabel';
+import LiquidSelect from '@/Components/Glass/LiquidSelect';
 import { SvgIcon } from '@/Components/IconButton';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -76,12 +78,13 @@ export default function AlertsIndex({ filters = {}, alerts = [], summary = {}, t
                 <form onSubmit={applyFilters} className="glass-panel rounded-[2rem] p-5">
                     <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_auto] lg:items-end">
                         <div>
-                            <label className="text-sm font-bold text-app-muted">Buscar</label>
+                            <InputLabel htmlFor="alerts-search" className="text-sm font-bold text-app-muted">Buscar</InputLabel>
                             <div className="relative mt-1">
                                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-app-muted">
                                     <SvgIcon name="search" />
                                 </span>
                                 <input
+                                    id="alerts-search"
                                     type="search"
                                     value={form.q}
                                     onChange={(event) => setForm((current) => ({ ...current, q: event.target.value }))}
@@ -92,6 +95,7 @@ export default function AlertsIndex({ filters = {}, alerts = [], summary = {}, t
                         </div>
 
                         <SelectField
+                            id="alerts-type"
                             label="Tipo"
                             value={form.type}
                             options={types}
@@ -100,6 +104,7 @@ export default function AlertsIndex({ filters = {}, alerts = [], summary = {}, t
                         />
 
                         <SelectField
+                            id="alerts-severity"
                             label="Severidad"
                             value={form.severity}
                             options={severities}
@@ -156,18 +161,18 @@ function SummaryCard({ label, value, tone }) {
     );
 }
 
-function SelectField({ label, value, options, placeholder, onChange }) {
+function SelectField({ id, label, value, options, placeholder, onChange }) {
     return (
         <div>
-            <label className="text-sm font-bold text-app-muted">{label}</label>
-            <select value={value} onChange={(event) => onChange(event.target.value)} className="ios-field mt-1 block w-full">
+            <InputLabel htmlFor={id} className="text-sm font-bold text-app-muted">{label}</InputLabel>
+            <LiquidSelect id={id} value={value} onChange={(event) => onChange(event.target.value)} className="ios-field mt-1 block w-full">
                 <option value="">{placeholder}</option>
                 {options.map((option) => (
                     <option key={option.value} value={option.value}>
                         {option.label}
                     </option>
                 ))}
-            </select>
+            </LiquidSelect>
         </div>
     );
 }

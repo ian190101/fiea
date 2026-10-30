@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 class AddSecurityHeaders
@@ -13,6 +14,7 @@ class AddSecurityHeaders
      */
     public function handle(Request $request, Closure $next): Response
     {
+        Vite::useCspNonce();
         $response = $next($request);
 
         $response->headers->set('X-Content-Type-Options', 'nosniff');
@@ -24,9 +26,9 @@ class AddSecurityHeaders
         if (app()->environment('production')) {
             $response->headers->set('Content-Security-Policy', implode('; ', [
                 "default-src 'self'",
-                "script-src 'self'",
+                "script-src 'self' 'nonce-".Vite::cspNonce()."'",
                 "style-src 'self' 'unsafe-inline'",
-                "img-src 'self' data: https:",
+                "img-src 'self' data:",
                 "font-src 'self' data:",
                 "connect-src 'self'",
                 "object-src 'none'",

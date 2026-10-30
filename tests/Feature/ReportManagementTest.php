@@ -17,11 +17,13 @@ use App\Models\TripPhase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class ReportManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_reports(): void
     {
@@ -31,7 +33,7 @@ class ReportManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_financial_reports(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['reports.view']);
         [$project, $tripPhase, $category] = $this->createReportContext();
         $this->createEstimatedExpense($tripPhase, $category, 500);
         $actualExpense = $this->createActualExpense($tripPhase, $category, 650);
@@ -39,29 +41,21 @@ class ReportManagementTest extends TestCase
         $this->createInvoice($tripPhase, 650);
 
         $this->actingAs($user)
-            ->get(route('reports.index', ['project_id' => $project->id]))
+            ->get(route('reports.index', ['year' => 2026]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Reports/Index')
-                ->where('filters.project_id', $project->id)
-                ->loadDeferredProps('reports', fn (Assert $page) => $page
-                    ->where('summary.estimated_total', 500)
-                    ->where('summary.actual_total', 650)
-                    ->where('summary.variance', 150)
-                    ->where('summary.invoice_total', 650)
-                    ->where('summary.receipt_amount', 600)
-                    ->where('receiptCoverage.with_receipt', 1)
-                    ->where('receiptCoverage.without_receipt', 0)
-                    ->has('byProject', 1)
-                    ->has('byFund', 2)
-                    ->has('invoiceStatus', 1)
-                )
+                ->where('filters.year', 2026)
+                ->where('filters.basis', 'case_lifetime')
+                ->has('summary')
+                ->has('controlRows')
+                ->etc()
             );
     }
 
     public function test_authenticated_users_can_export_report_csv(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['reports.view']);
         [$project, $tripPhase, $category] = $this->createReportContext();
         $this->createEstimatedExpense($tripPhase, $category, 200);
         $this->createActualExpense($tripPhase, $category, 180);

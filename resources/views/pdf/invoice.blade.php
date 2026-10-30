@@ -1,357 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Invoice {{ $invoice->code }}</title>
-    <style>
-        @page {
-            margin: 36px 36px 42px;
-        }
-
-        body {
-            color: #1f2937;
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 11px;
-            line-height: 1.35;
-        }
-
-        h1, h2, p {
-            margin: 0;
-        }
-
-        .header {
-            border-bottom: 3px solid {{ $brand['primary'] ?? '#2563eb' }};
-            padding-bottom: 14px;
-        }
-
-        .header-table, .summary, .meta, table.lines {
-            width: 100%;
-        }
-
-        .header-logo {
-            text-align: right;
-            width: 110px;
-        }
-
-        .header-logo img {
-            max-height: 54px;
-            max-width: 110px;
-        }
-
-        .brand {
-            color: {{ $brand['primary'] ?? '#2563eb' }};
-            font-size: 12px;
-            font-weight: bold;
-            letter-spacing: 1.2px;
-            text-transform: uppercase;
-        }
-
-        h1 {
-            color: #111827;
-            font-size: 26px;
-            margin-top: 4px;
-        }
-
-        .muted {
-            color: #6b7280;
-        }
-
-        .meta {
-            border-spacing: 0 12px;
-            margin-top: 18px;
-        }
-
-        .meta td {
-            border: 1px solid #d1d5db;
-            padding: 12px;
-            vertical-align: top;
-            width: 50%;
-        }
-
-        .grid {
-            display: table;
-            margin-top: 18px;
-            width: 100%;
-        }
-
-        .grid-row {
-            display: table-row;
-        }
-
-        .grid-cell {
-            display: table-cell;
-            padding-right: 14px;
-            vertical-align: top;
-            width: 50%;
-        }
-
-        .label {
-            color: #6b7280;
-            font-size: 9px;
-            font-weight: bold;
-            letter-spacing: .6px;
-            text-transform: uppercase;
-        }
-
-        .value {
-            color: #111827;
-            font-size: 12px;
-            font-weight: bold;
-            margin-top: 2px;
-        }
-
-        .summary {
-            margin-top: 14px;
-        }
-
-        .summary td {
-            border: 1px solid #d1d5db;
-            padding: 10px;
-        }
-
-        .summary .amount {
-            font-size: 16px;
-            font-weight: bold;
-            text-align: right;
-        }
-
-        .note {
-            background: #f8fafc;
-            border-left: 4px solid {{ $brand['accent'] ?? '#f59e0b' }};
-            color: #475569;
-            margin-top: 14px;
-            padding: 10px 12px;
-        }
-
-        .section-title {
-            color: #111827;
-            font-size: 15px;
-            margin-bottom: 8px;
-            margin-top: 22px;
-        }
-
-        table.lines {
-            border-collapse: collapse;
-        }
-
-        table.lines th {
-            background: #eff6ff;
-            border: 1px solid #cbd5e1;
-            color: {{ $brand['primary'] ?? '#2563eb' }};
-            font-size: 9px;
-            padding: 7px;
-            text-align: left;
-            text-transform: uppercase;
-        }
-
-        table.lines td {
-            border: 1px solid #d1d5db;
-            padding: 7px;
-            vertical-align: top;
-        }
-
-        .right {
-            text-align: right;
-        }
-
-        .fund {
-            border-radius: 4px;
-            color: #ffffff;
-            display: inline-block;
-            font-size: 9px;
-            font-weight: bold;
-            padding: 2px 6px;
-        }
-
-        .fund-dr {
-            background: {{ $brand['primary'] ?? '#2563eb' }};
-        }
-
-        .fund-wodr {
-            background: {{ $brand['secondary'] ?? '#0f766e' }};
-        }
-
-        .footer {
-            border-top: 1px solid #d1d5db;
-            bottom: -22px;
-            color: #6b7280;
-            font-size: 9px;
-            left: 0;
-            padding-top: 8px;
-            position: fixed;
-            right: 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <table class="header-table">
-            <tr>
-                <td>
-                    <p class="brand">FIEA Invoice</p>
-                    <h1>{{ $invoice->type }} {{ ucfirst($invoice->stage) }} Invoice</h1>
-                    <p class="muted">{{ $invoice->code }} - Generated on {{ $generatedAt->format('F j, Y') }}</p>
-                </td>
-                @if($logoDataUri)
-                    <td class="header-logo">
-                        <img src="{{ $logoDataUri }}" alt="FIEA">
-                    </td>
-                @endif
-            </tr>
-        </table>
-    </div>
-
-    <table class="meta">
-        <tr>
-            <td>
-                <p class="label">Project</p>
-                <p class="value">{{ $invoice->tripPhase?->project?->name }}</p>
-                <p class="muted">{{ $invoice->tripPhase?->project?->code }} - {{ $invoice->tripPhase?->project?->country?->name }}@if($invoice->tripPhase?->project?->community), {{ $invoice->tripPhase?->project?->community?->name }}@endif</p>
-            </td>
-            <td>
-                <p class="label">Invoice Details</p>
-                <p class="value">{{ $invoice->type }} / {{ ucfirst($invoice->stage) }}</p>
-                <p class="muted">Status: {{ ucfirst(str_replace('_', ' ', $invoice->status)) }} - Accounting: {{ ucfirst(str_replace('_', ' ', $invoice->accounting_status)) }}</p>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <p class="label">Travel Phase</p>
-                <p class="value">{{ $invoice->tripPhase?->phase }}</p>
-                <p class="muted">{{ $invoice->tripPhase?->starts_on?->format('M j, Y') }} - {{ $invoice->tripPhase?->ends_on?->format('M j, Y') }}</p>
-            </td>
-            <td>
-                <p class="label">Team / Contact</p>
-                <p class="value">{{ $invoice->tripPhase?->team?->name }}</p>
-                <p class="muted">{{ $invoice->contactPerson?->full_name ?? 'No contact selected' }}@if($invoice->contactPerson?->email) - {{ $invoice->contactPerson->email }}@endif</p>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <p class="label">Dates</p>
-                <p class="value">Sent: {{ $invoice->sent_at?->format('M j, Y') ?? 'Not sent' }}</p>
-                <p class="muted">Paid: {{ $invoice->paid_at?->format('M j, Y') ?? 'Not paid' }}</p>
-            </td>
-            <td>
-                <p class="label">Accounting Review</p>
-                <p class="value">{{ $invoice->accountingReviewedBy?->name ?? 'Not reviewed' }}</p>
-                <p class="muted">{{ $invoice->accounting_reviewed_at?->format('M j, Y') ?? 'Pending review' }}</p>
-            </td>
-        </tr>
-    </table>
-
-    <table class="summary">
-        <tr>
-            <td>
-                <p class="label">DR Total</p>
-                <p class="amount">${{ number_format((float) $invoice->total_dr, 2) }}</p>
-            </td>
-            <td>
-                <p class="label">WODR Total</p>
-                <p class="amount">${{ number_format((float) $invoice->total_wodr, 2) }}</p>
-            </td>
-            <td>
-                <p class="label">Grand Total</p>
-                <p class="amount">${{ number_format((float) $invoice->grand_total, 2) }}</p>
-            </td>
-            <td>
-                <p class="label">Balance Conciliation</p>
-                <p class="amount">${{ number_format((float) $invoice->balance_conciliation, 2) }}</p>
-            </td>
-        </tr>
-    </table>
-
-    @if($invoice->accounting_note)
-        <p class="note"><strong>Accounting note:</strong> {{ $invoice->accounting_note }}</p>
-    @else
-        <p class="note">This invoice is prepared in English for FIEA financial reporting and United States review. Amounts reflect actual expenses registered for this travel phase.</p>
-    @endif
-
-    <div class="grid">
-        <div class="grid-row">
-            <div class="grid-cell">
-                <h2 class="section-title">Fund Summary</h2>
-                <table class="lines">
-                    <thead>
-                        <tr>
-                            <th>Fund</th>
-                            <th class="right">Actual Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($fundSummary as $row)
-                            <tr>
-                                <td>{{ $row['name'] }}</td>
-                                <td class="right">${{ number_format($row['total'], 2) }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-            <div class="grid-cell">
-                <h2 class="section-title">Category Summary</h2>
-                <table class="lines">
-                    <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th class="right">Actual Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($categorySummary as $row)
-                            <tr>
-                                <td>{{ $row['name'] }}</td>
-                                <td class="right">${{ number_format($row['total'], 2) }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="2" class="muted">No category totals available.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <h2 class="section-title">Actual Expenses</h2>
-    <table class="lines">
-        <thead>
-            <tr>
-                <th style="width: 31%;">Description</th>
-                <th style="width: 21%;">Category</th>
-                <th style="width: 10%;">Fund</th>
-                <th style="width: 12%;">Unit</th>
-                <th class="right" style="width: 10%;">Unit Cost</th>
-                <th class="right" style="width: 7%;">Qty</th>
-                <th class="right" style="width: 9%;">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($expenses as $expense)
-                <tr>
-                    <td>{{ $expense->description }}</td>
-                    <td>{{ $expense->expenseCategory?->name }}</td>
-                    <td>
-                        <span class="fund {{ $expense->fund_type === 'DR' ? 'fund-dr' : 'fund-wodr' }}">
-                            {{ $expense->fund_type }}
-                        </span>
-                    </td>
-                    <td>{{ $expense->unit ?: '-' }}</td>
-                    <td class="right">${{ number_format((float) $expense->final_unit_cost, 2) }}</td>
-                    <td class="right">{{ number_format((float) $expense->final_quantity, 2) }}</td>
-                    <td class="right">${{ number_format((float) $expense->real_total, 2) }}</td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="7" class="muted">No actual expenses have been registered for this invoice travel phase.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
-
-    <div class="footer">
-        FIEA Invoice - official document for United States reporting.
-    </div>
-</body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><style>
+body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#193247}
+header{border-bottom:2px solid #1d5a77;padding-bottom:8px;margin-bottom:12px}
+h1{font-size:20px;margin:0} h2{font-size:13px;margin-top:18px}
+table{border-collapse:collapse;width:100%;margin-top:10px}th,td{border:1px solid #b8c8d2;padding:4px;text-align:left}
+th{background:#e8f1f5} .money{text-align:right;white-space:nowrap}.muted{color:#536b77}
+.page-break{page-break-before:always}
+</style></head><body>
+@php $money=\App\Support\MoneyPresenter::class; $totals=$snapshot['totals']; @endphp
+<header><h1>{{ $snapshot['type'] }} {{ strtoupper($snapshot['stage']) }} INVOICE</h1>
+<p>{{ $invoice->code }} @if(!in_array($invoice->status,['approved','sent','paid'],true)) — BORRADOR @endif</p></header>
+<p><strong>Project / Proyecto:</strong> {{ $snapshot['metadata']['project_name'] ?? '' }}</p>
+<p><strong>Team / Equipo:</strong> {{ $snapshot['metadata']['team_name'] ?? '' }}</p>
+<p><strong>Dates / Fechas:</strong> {{ $snapshot['metadata']['starts_on'] ?? '' }} – {{ $snapshot['metadata']['ends_on'] ?? '' }}</p>
+<p><strong>Contact:</strong> {{ $snapshot['metadata']['invoice_name'] ?? '' }} · {{ $snapshot['metadata']['email'] ?? '' }}</p>
+<p><strong>Address / Dirección:</strong> {{ $snapshot['metadata']['address'] ?? '' }} · {{ $snapshot['metadata']['phone'] ?? '' }}</p>
+<p><strong>Code / Código:</strong> {{ $snapshot['metadata']['project_code'] ?? '' }} · <strong>Date / Fecha:</strong> {{ $snapshot['metadata']['document_date'] ?? '' }}</p>
+<h2>Financial detail / Detalle financiero</h2>
+<table><thead><tr><th>Description / Descripción</th><th>Unit</th><th>Qty</th><th>Unit cost</th><th>Receipt</th><th>Amount</th></tr></thead><tbody>
+@foreach($snapshot['lines'] as $line)
+<tr><td>{{ $line['description_en'] ?? '' }} / {{ $line['description_es'] ?? '' }}</td>
+<td>{{ $line['unit'] ?? '' }}</td><td>{{ $line['quantity'] ?? \App\Support\Decimal::quantity(\App\Support\Decimal::sum(array_column($line['cells'] ?? [],'quantity'))) }}</td>
+<td class="money">{{ $money::format((string)($line['unit_cost'] ?? '0')) }}</td>
+<td>{{ $line['receipt_number'] ?? '' }}</td>
+<td class="money">{{ $money::format(\App\Support\Decimal::money((string)($line['raw_amount'] ?? '0'))) }}</td></tr>
+@foreach($line['cells'] ?? [] as $cell)
+@if(!empty($cell['receipt_number']))
+<tr><td class="muted">{{ $cell['date'] ?? '' }}</td><td></td><td>{{ $cell['quantity'] ?? '' }}</td><td></td>
+<td>{{ $cell['receipt_number'] }}</td><td></td></tr>
+@endif
+@endforeach
+@endforeach
+</tbody></table>
+<h2>Totals / Totales</h2>
+<table><tbody>
+<tr><th>DR</th><td class="money">{{ $money::format((string)$totals['totalDr']) }}</td></tr>
+<tr><th>WODR</th><td class="money">{{ $money::format((string)$totals['totalWodr']) }}</td></tr>
+@if(isset($totals['serviceFee']))<tr><th>{{ $snapshot['type']==='IC'?'Arranged fee':'Material fee' }}</th><td class="money">{{ $money::format((string)$totals['serviceFee']) }}</td></tr>@endif
+@if(isset($totals['bankFee']))<tr><th>Bank fee</th><td class="money">{{ $money::format((string)$totals['bankFee']) }}</td></tr>@endif
+@if(isset($totals['contingency']))<tr><th>Contingency</th><td class="money">{{ $money::format((string)$totals['contingency']) }}</td></tr>@endif
+<tr><th>Grand total</th><td class="money">{{ $money::format((string)$totals['total']) }}</td></tr>
+</tbody></table>
+@if($snapshot['stage']==='final' && !empty($snapshot['initial_snapshot']))
+<div class="page-break"><h2>Initial / Etapa inicial</h2>
+<p>Initial total: {{ $money::format((string)$snapshot['initial_total']) }}</p>
+<table><thead><tr><th>Description</th><th>Qty</th><th>Amount</th></tr></thead><tbody>
+@foreach($snapshot['initial_snapshot']['lines'] ?? [] as $line)
+<tr><td>{{ $line['description_en'] ?? '' }}</td><td>{{ $line['quantity'] ?? \App\Support\Decimal::quantity(\App\Support\Decimal::sum(array_column($line['cells'] ?? [],'quantity'))) }}</td>
+<td class="money">{{ $money::format(\App\Support\Decimal::money((string)($line['raw_amount'] ?? '0'))) }}</td></tr>
+@endforeach
+</tbody></table></div>
+@endif
+<p><strong>BALANCE DUE FINAL:</strong> {{ $money::format((string)$totals['balanceDue']) }}</p>
+@if($snapshot['stage']==='final')
+<p>IF BALANCE IS POSITIVE THEN PLEASE MAKE THE REQUIRED PAYMENT</p>
+<p>IF BALANCE IS NEGATIVE THEN NO PAYMENT IS REQUIRED</p>
+@endif
+@foreach($snapshot['payment_terms'] ?? [] as $term)
+@if(is_string($term))<p>{{ $term }}</p>@elseif(is_array($term))<p>{{ implode(' · ',$term) }}</p>@endif
+@endforeach
+</body></html>

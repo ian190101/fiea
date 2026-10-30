@@ -20,8 +20,8 @@ class EstimatedExpense extends Model
     protected function casts(): array
     {
         return [
-            'initial_unit_cost' => 'decimal:2',
-            'initial_quantity' => 'decimal:2',
+            'initial_unit_cost' => 'decimal:4',
+            'initial_quantity' => 'decimal:4',
             'estimated_total' => 'decimal:2',
         ];
     }

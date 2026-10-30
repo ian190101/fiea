@@ -7,6 +7,8 @@ use App\Models\ChapterType;
 use App\Models\Team;
 use App\Models\University;
 use App\Models\User;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,7 +24,7 @@ class ChapterTeamManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_chapters(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
 
         $this->actingAs($user)
             ->get('/capitulos')
@@ -31,7 +33,7 @@ class ChapterTeamManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_chapters_with_optional_university(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $chapterType = ChapterType::query()->create([
             'name' => 'Universitario',
             'description' => null,
@@ -57,7 +59,7 @@ class ChapterTeamManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_professional_chapters_without_university(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $chapterType = ChapterType::query()->create([
             'name' => 'Profesional',
             'description' => null,
@@ -80,9 +82,9 @@ class ChapterTeamManagementTest extends TestCase
         ]);
     }
 
-    public function test_authenticated_users_can_create_teams_with_credit_balance(): void
+    public function test_crear_equipo_no_acepta_saldo_editable(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $chapter = $this->createChapter();
 
         $this->actingAs($user)
@@ -98,13 +100,13 @@ class ChapterTeamManagementTest extends TestCase
         $this->assertDatabaseHas('teams', [
             'chapter_id' => $chapter->id,
             'name' => 'Cerritos Team',
-            'credit_balance' => 1250.75,
+            'credit_balance' => 0,
         ]);
     }
 
-    public function test_authenticated_users_can_update_team_credit_balance(): void
+    public function test_actualizar_equipo_no_modifica_saldo_sin_ledger(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $chapter = $this->createChapter();
         $team = Team::query()->create([
             'chapter_id' => $chapter->id,
@@ -125,13 +127,13 @@ class ChapterTeamManagementTest extends TestCase
 
         $this->assertDatabaseHas('teams', [
             'id' => $team->id,
-            'credit_balance' => 500,
+            'credit_balance' => 0,
         ]);
     }
 
     public function test_team_names_must_be_unique_inside_the_same_chapter(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $chapter = $this->createChapter();
         Team::query()->create([
             'chapter_id' => $chapter->id,
@@ -152,7 +154,7 @@ class ChapterTeamManagementTest extends TestCase
 
     public function test_authenticated_users_can_delete_unused_teams(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser();
         $chapter = $this->createChapter();
         $team = Team::query()->create([
             'chapter_id' => $chapter->id,
@@ -169,6 +171,21 @@ class ChapterTeamManagementTest extends TestCase
         $this->assertDatabaseMissing('teams', [
             'id' => $team->id,
         ]);
+    }
+
+    private function authorizedUser(): User
+    {
+        $user = User::factory()->create(['is_active' => true, 'must_change_password' => false]);
+        $user->forceFill(['scope_all' => true])->save();
+        $role = Role::query()->firstOrCreate(['code' => 'chapters_test'], ['name' => 'Capítulos prueba']);
+        foreach (['chapters.view', 'chapters.manage'] as $code) {
+            $permission = Permission::query()->firstOrCreate(['code' => $code], [
+                'module' => 'chapters', 'name' => $code,
+            ]);
+            $role->permissions()->syncWithoutDetaching([$permission->id]);
+        }
+        $user->roles()->attach($role);
+        return $user;
     }
 
     private function createChapter(): Chapter

@@ -14,11 +14,13 @@ use App\Models\TripPhase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class DashboardTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_dashboard(): void
     {
@@ -28,7 +30,7 @@ class DashboardTest extends TestCase
 
     public function test_authenticated_users_can_view_dashboard_metrics(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['dashboard.view']);
         $tripPhase = $this->createDashboardContext();
         $category = ExpenseCategory::query()->create([
             'name' => 'Dashboard Lodging',
@@ -74,16 +76,10 @@ class DashboardTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard')
                 ->missing('metrics')
-                ->has('systemRules')
-                ->loadDeferredProps('dashboard', fn (Assert $page) => $page
-                    ->where('metrics.open_invoices', 1)
-                    ->where('metrics.expenses_without_receipts', 1)
-                    ->where('financials.real_total', 240)
-                    ->has('invoiceStatus', 1)
-                    ->has('accountingStatus', 1)
-                    ->has('upcomingTrips', 1)
-                    ->has('attentionItems', 4)
-                )
+                ->missing('systemRules')
+                ->missing('financials')
+                ->missing('invoiceStatus')
+                ->missing('upcomingTrips')
             );
     }
 

@@ -2,8 +2,11 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
+import FinancialActionSheet from '@/Components/FinancialActionSheet';
+import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
 import { Transition } from '@headlessui/react';
 import { Link, useForm, usePage } from '@inertiajs/react';
+import { useRef } from 'react';
 
 export default function UpdateProfileInformation({
     mustVerifyEmail,
@@ -11,6 +14,7 @@ export default function UpdateProfileInformation({
     className = '',
 }) {
     const user = usePage().props.auth.user;
+    const formRef = useRef(null);
 
     const { data, setData, patch, errors, processing, recentlySuccessful } =
         useForm({
@@ -18,15 +22,19 @@ export default function UpdateProfileInformation({
             username: user.username,
             email: user.email ?? '',
         });
+    const guard = useUnsavedChangesGuard(data.name !== user.name || data.username !== user.username || data.email !== (user.email ?? ''));
 
     const submit = (e) => {
         e.preventDefault();
 
-        patch(route('profile.update'));
+        patch(route('profile.update'), {
+            onError: () => requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus()),
+        });
     };
 
     return (
         <section className={className}>
+            <FinancialActionSheet {...guard.dialogProps} />
             <header>
                 <h2 className="text-xl font-black text-app-text">Informacion de perfil</h2>
 
@@ -35,12 +43,15 @@ export default function UpdateProfileInformation({
                 </p>
             </header>
 
-            <form onSubmit={submit} className="mt-6 space-y-6">
+            {Object.keys(errors).length > 0 && <p role="alert" className="mt-4 text-sm font-semibold text-red-700 dark:text-red-200">Revisa los campos marcados.</p>}
+            <form ref={formRef} onSubmit={submit} className="mt-6 space-y-6">
                 <div>
                     <InputLabel htmlFor="name" value="Nombre completo" />
 
                     <TextInput
                         id="name"
+                        aria-invalid={Boolean(errors.name)}
+                        aria-describedby={errors.name ? "name-error" : undefined}
                         className="mt-1 block w-full"
                         value={data.name}
                         onChange={(e) => setData('name', e.target.value)}
@@ -49,7 +60,7 @@ export default function UpdateProfileInformation({
                         autoComplete="name"
                     />
 
-                    <InputError className="mt-2" message={errors.name} />
+                    <InputError id="name-error" className="mt-2" message={errors.name} />
                 </div>
 
                 <div>
@@ -57,6 +68,8 @@ export default function UpdateProfileInformation({
 
                     <TextInput
                         id="username"
+                        aria-invalid={Boolean(errors.username)}
+                        aria-describedby={errors.username ? "username-error" : undefined}
                         className="mt-1 block w-full"
                         value={data.username}
                         onChange={(e) => setData('username', e.target.value)}
@@ -64,7 +77,7 @@ export default function UpdateProfileInformation({
                         autoComplete="username"
                     />
 
-                    <InputError className="mt-2" message={errors.username} />
+                    <InputError id="username-error" className="mt-2" message={errors.username} />
                 </div>
 
                 <div>
@@ -72,6 +85,8 @@ export default function UpdateProfileInformation({
 
                     <TextInput
                         id="email"
+                        aria-invalid={Boolean(errors.email)}
+                        aria-describedby={errors.email ? "email-error" : undefined}
                         type="email"
                         className="mt-1 block w-full"
                         value={data.email}
@@ -79,7 +94,7 @@ export default function UpdateProfileInformation({
                         autoComplete="email"
                     />
 
-                    <InputError className="mt-2" message={errors.email} />
+                    <InputError id="email-error" className="mt-2" message={errors.email} />
                 </div>
 
                 {mustVerifyEmail && user.email_verified_at === null && (
@@ -97,7 +112,7 @@ export default function UpdateProfileInformation({
                         </p>
 
                         {status === 'verification-link-sent' && (
-                            <div className="mt-2 text-sm font-bold text-emerald-600 dark:text-emerald-300">
+                            <div role="status" className="mt-2 text-sm font-bold text-emerald-600 dark:text-emerald-300">
                                 Se envio un nuevo enlace de verificacion.
                             </div>
                         )}
@@ -114,7 +129,7 @@ export default function UpdateProfileInformation({
                         leave="transition ease-in-out"
                         leaveTo="opacity-0"
                     >
-                        <p className="text-sm font-bold text-app-muted">
+                        <p role="status" className="text-sm font-bold text-app-muted">
                             Guardado.
                         </p>
                     </Transition>

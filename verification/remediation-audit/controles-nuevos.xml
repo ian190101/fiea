@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="C:\Users\Ian\Desktop\FIEA_sist\phpunit.xml" tests="6" assertions="34" errors="0" failures="0" skipped="0" time="1.550695">
+    <testsuite name="Feature" tests="6" assertions="34" errors="0" failures="0" skipped="0" time="1.550695">
+      <testsuite name="Tests\Feature\PasswordInputPolicyTest" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\PasswordInputPolicyTest.php" tests="2" assertions="16" errors="0" failures="0" skipped="0" time="1.262275">
+        <testcase name="test_limite_bcrypt_admite_72_bytes_y_rechaza_exceso_unicode_sin_cambiar_clave" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\PasswordInputPolicyTest.php" line="14" class="Tests\Feature\PasswordInputPolicyTest" classname="Tests.Feature.PasswordInputPolicyTest" assertions="10" time="1.187574"/>
+        <testcase name="test_identificador_unicode_mixto_se_autentica_mediante_su_indice_normalizado" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\PasswordInputPolicyTest.php" line="31" class="Tests\Feature\PasswordInputPolicyTest" classname="Tests.Feature.PasswordInputPolicyTest" assertions="6" time="0.074701"/>
+      </testsuite>
+      <testsuite name="Tests\Feature\UserScopeEditorTest" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\UserScopeEditorTest.php" tests="4" assertions="18" errors="0" failures="0" skipped="0" time="0.288419">
+        <testcase name="test_opciones_permiten_buscar_y_alcanzar_proyectos_despues_del_25" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\UserScopeEditorTest.php" line="27" class="Tests\Feature\UserScopeEditorTest" classname="Tests.Feature.UserScopeEditorTest" assertions="7" time="0.081607"/>
+        <testcase name="test_opciones_y_administracion_global_rechazan_alcance_parcial" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\UserScopeEditorTest.php" line="39" class="Tests\Feature\UserScopeEditorTest" classname="Tests.Feature.UserScopeEditorTest" assertions="3" time="0.067731"/>
+        <testcase name="test_indice_incluye_concesiones_actuales_sin_exponer_credenciales" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\UserScopeEditorTest.php" line="48" class="Tests\Feature\UserScopeEditorTest" classname="Tests.Feature.UserScopeEditorTest" assertions="6" time="0.067686"/>
+        <testcase name="test_retirar_permisos_de_un_rol_personalizado_no_elimina_al_ultimo_administrador" file="C:\Users\Ian\Desktop\FIEA_sist\tests\Feature\UserScopeEditorTest.php" line="66" class="Tests\Feature\UserScopeEditorTest" classname="Tests.Feature.UserScopeEditorTest" assertions="2" time="0.071395"/>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

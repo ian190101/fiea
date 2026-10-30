@@ -1,0 +1,614 @@
+diff --git a/node_modules/@ybouane/liquidglass/src/LiquidGlass.ts b/node_modules/@ybouane/liquidglass/src/LiquidGlass.ts
+--- a/node_modules/@ybouane/liquidglass/src/LiquidGlass.ts
++++ b/node_modules/@ybouane/liquidglass/src/LiquidGlass.ts
+@@ -26,6 +26,9 @@
+ 	glassElements?: NodeListOf<HTMLElement> | HTMLElement[];
+ 	/** Override the default configuration values. */
+ 	defaults?: Partial<GlassConfig>;
++	/** Evita capturas sin contribución óptica; conserva el renderizador original. */
++	captureFilter?: (element: HTMLElement, orderedChildren: HTMLElement[], glassSet: Set<HTMLElement>) => boolean;
++	signal?: AbortSignal;
+ }
+ 
+ interface DragState {
+@@ -85,9 +88,23 @@
+ 	// ────────────────────────────────────────────
+ 
+ 	static async init(options: LiquidGlassOptions): Promise<LiquidGlass> {
++		options.signal?.throwIfAborted();
+ 		const instance = new LiquidGlass(options);
+-		await instance._start();
+-		return instance;
++		const abort = () => {
++            instance.destroy();
++            instance.renderer.gl.getExtension('WEBGL_lose_context')?.loseContext();
++        };
++        options.signal?.throwIfAborted();
++        options.signal?.addEventListener('abort', abort, { once: true });
++        try {
++            await instance._start();
++            return instance;
++        } catch (error) {
++            if (!options.signal?.aborted) abort();
++            throw error;
++        } finally {
++            options.signal?.removeEventListener('abort', abort);
++        }
+ 	}
+ 
+ 	// ────────────────────────────────────────────
+@@ -104,6 +121,8 @@
+ 	/** Current frames-per-second (updated every frame). */
+ 	fps = 0;
+ 
++	private readonly _captureFilter: NonNullable<LiquidGlassOptions['captureFilter']>;
++	private readonly _signal?: AbortSignal;
+ 	private _running = false;
+ 	private _rafId = 0;
+ 	private _hasDynamic = false;
+@@ -144,6 +163,8 @@
+ 	private _fpsFrames = 0;
+ 	private _fpsTime = 0;
+ 
++	private _sizeObserver: ResizeObserver | null = null;
++	private _geometryDirty = true;
+ 	private _observer: MutationObserver | null = null;
+ 	private _glassSubtreeObserver: MutationObserver | null = null;
+ 
+@@ -174,10 +195,12 @@
+ 	// Constructor (prefer LiquidGlass.init)
+ 	// ────────────────────────────────────────────
+ 
+-	constructor({ root, glassElements, defaults = {} }: LiquidGlassOptions) {
++	constructor({ root, glassElements, defaults = {}, captureFilter = () => true, signal }: LiquidGlassOptions) {
+ 		if (!root) throw new Error('LiquidGlass: `root` element is required.');
+ 
+ 		this.root = root;
++		this._captureFilter = captureFilter;
++		this._signal = signal;
+ 		this.defaults = { ...DEFAULTS, ...defaults };
+ 		this.glassSet = new Set(Array.from(glassElements || []));
+ 		this.glassCanvases = new Map();
+@@ -219,12 +242,15 @@
+ 		this._hasDynamic = this._detectDynamic();
+ 		this._sortedChildren = this._getSortedChildren();
+ 		this._handleResize();
++        this._sizeObserver = new ResizeObserver(() => { this._geometryDirty = true; });
++        for (const el of this.glassSet) this._sizeObserver.observe(el);
+ 
+ 		// Resolve the page's @font-face rules to base64 data URLs once
+ 		// up front, so every subsequent html-to-image capture renders
+ 		// text with the page's actual webfont (matching glyph metrics
+ 		// with the live DOM under the glass).
+ 		await this.capture.prefetchFontEmbedCSS();
++		this._signal?.throwIfAborted();
+ 
+ 		await this._captureGlassContent();
+ 		// Pre-warm the static-content cache so the first rendered frame
+@@ -232,6 +258,7 @@
+ 		// shader briefly samples an empty (white) local scene while
+ 		// async html-to-image captures resolve.
+ 		await this._prewarmStaticCaptures();
++		this._signal?.throwIfAborted();
+ 
+ 		window.addEventListener('resize', this._onResize);
+ 		this.root.addEventListener('pointerdown', this._onPointerDown);
+@@ -278,6 +305,8 @@
+ 
+ 		this._running = true;
+ 		this._globalDirty = true;
++		// Presentación atómica: los lienzos ya tienen píxeles al resolver init.
++		this._renderFrame();
+ 		this._rafId = requestAnimationFrame(() => this._renderLoop());
+ 	}
+ 
+@@ -293,6 +322,8 @@
+ 		window.removeEventListener('pointermove', this._onPointerMove);
+ 		window.removeEventListener('pointerup', this._onPointerUp);
+ 
++		this._sizeObserver?.disconnect();
++		this._sizeObserver = null;
+ 		this._observer?.disconnect();
+ 		this._observer = null;
+ 		this._glassSubtreeObserver?.disconnect();
+@@ -539,6 +570,10 @@
+ 	 * running, the affected elements stay in `_glassContentDirty` and
+ 	 * the next render-loop tick picks them up.
+ 	 */
++	needsSnapshot(element: HTMLElement): boolean {
++		return this._captureFilter(element, this._sortedChildren, this.glassSet);
++	}
++
+ 	private async _captureGlassContent(
+ 		targets: Set<HTMLElement> | null = null,
+ 	): Promise<void> {
+@@ -546,7 +581,12 @@
+ 		this._capturingGlassContent = true;
+ 		try {
+ 			for (const [el, glassCanvas] of this.glassCanvases) {
+-				if (targets && !targets.has(el)) continue;
++				this._signal?.throwIfAborted();
++                if (targets && !targets.has(el)) continue;
++                if (!this.needsSnapshot(el)) {
++                    this._glassContentImages.delete(el);
++                    continue;
++                }
+ 				const rect = el.getBoundingClientRect();
+ 				const img = await this.capture.captureToCanvas(
+ 					el,
+@@ -572,7 +612,9 @@
+ 	 */
+ 	private async _prewarmStaticCaptures(): Promise<void> {
+ 		for (const child of this._sortedChildren) {
++			this._signal?.throwIfAborted();
+ 			if (this.glassSet.has(child)) continue;
++			if (!this.needsSnapshot(child)) continue;
+ 			const tag = child.tagName;
+ 			if (tag === 'CANVAS' || tag === 'IMG' || tag === 'VIDEO') continue;
+ 			if (child.hasAttribute('data-dynamic')) continue;
+@@ -946,7 +988,9 @@
+ 			this._fpsTime = now;
+ 		}
+ 
+-		if (this._checkGlassSizeChanges()) {
++		if (this._geometryDirty) {
++			this._geometryDirty = false;
++			this._checkGlassSizeChanges();
+ 			// _checkGlassSizeChanges already added the resized
+ 			// elements to _glassDirty per-element; nothing more to do.
+ 		}
+@@ -970,9 +1014,11 @@
+ 	}
+ 
+ 	private _renderFrame(): void {
+-		const dpr = window.devicePixelRatio || 1;
+-		const rootRect = this.root.getBoundingClientRect();
+-		const isDragging = this._drag.active;
++		// Sin invalidaciones, no se consulta el layout ni se compone otra textura.
++        if (!this._globalDirty && !this._glassDirty.size && !this._userMarkedChanged.size && !this._hasDynamic && !this._drag.active) return;
++        const dpr = window.devicePixelRatio || 1;
++        const rootRect = this.root.getBoundingClientRect();
++        const isDragging = this._drag.active;
+ 
+ 		// 1. Fan out user markChanged() calls into per-glass dirty marks.
+ 		if (this._userMarkedChanged.size > 0) {
+@@ -1185,6 +1231,7 @@
+ 		dpr: number,
+ 	): void {
+ 		const tag = child.tagName;
++		if (!this.needsSnapshot(child)) return;
+ 
+ 		if (tag === 'CANVAS' || tag === 'IMG' || tag === 'VIDEO') {
+ 			this._drawMediaElement(child, this._sceneCtx, sampleRect, rootRect, dpr);
+diff --git a/node_modules/@ybouane/liquidglass/dist/index.js b/node_modules/@ybouane/liquidglass/dist/index.js
+--- a/node_modules/@ybouane/liquidglass/dist/index.js
++++ b/node_modules/@ybouane/liquidglass/dist/index.js
+@@ -1015,9 +1015,9 @@
+     this.cache = /* @__PURE__ */ new Map();
+     this.dpr = 1;
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Public API
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   /**
+    * Resolve the page's @font-face rules into a single CSS string with
+    * every `url(...)` source already inlined as a base64 data URL. The
+@@ -1027,7 +1027,7 @@
+    * the refracted text line up with the live DOM under the glass.
+    *
+    * The build is shared at module scope across every LiquidGlass
+-   * instance — the first init() pays the fetch + base64 cost, every
++   * instance â€” the first init() pays the fetch + base64 cost, every
+    * subsequent init() awaits the same Promise.
+    *
+    * Implemented manually rather than via html-to-image's getFontEmbedCSS
+@@ -1066,10 +1066,10 @@
+    * Ensure an element's cached canvas is fresh enough for the current DPR.
+    *
+    * Cache semantics:
+-   *   - Fresh hit (size matches within 0.5 px) → return immediately.
+-   *   - Stale hit (size differs) → keep the stale entry so callers can
++   *   - Fresh hit (size matches within 0.5 px) â†’ return immediately.
++   *   - Stale hit (size differs) â†’ keep the stale entry so callers can
+    *     stretch-blit it, and kick off an async re-capture.
+-   *   - Cache miss → kick off an async capture.
++   *   - Cache miss â†’ kick off an async capture.
+    *
+    * Concurrent re-captures for the same element are deduplicated
+    * via the `_capturing` set, so calling this every frame is cheap.
+@@ -1162,9 +1162,9 @@
+   destroy() {
+     this.cache.clear();
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // html-to-image back-end
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   async _captureWithHtmlToImage(element, w, h, cssW, cssH) {
+     if (cssW <= 0 || cssH <= 0 || w <= 0 || h <= 0) return;
+     try {
+@@ -1478,9 +1478,9 @@
+     this.canvas.addEventListener("webglcontextlost", this._onContextLost);
+     this.canvas.addEventListener("webglcontextrestored", this._onContextRestored);
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Initialisation
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _initPrograms() {
+     this.blitP = this._link(VS_QUAD, FS_BLIT);
+     this.blitU = this._uloc(this.blitP, ["u_tex", "u_scale", "u_offset"]);
+@@ -1521,9 +1521,9 @@
+     gl.bindBuffer(gl.ARRAY_BUFFER, this.panelBuf);
+     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5]), gl.STATIC_DRAW);
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Resize
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   resize(width, height) {
+     this.width = width;
+     this.height = height;
+@@ -1535,9 +1535,9 @@
+     this.canvas.width = 0;
+     this.canvas.height = 0;
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Background upload
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   uploadAndBlur(sourceCanvas, sourceX, sourceY, width, height, blurAmount) {
+     if (this.contextLost) return;
+     const gl = this.gl;
+@@ -1592,9 +1592,9 @@
+       }
+     }
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Glass panel rendering
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   renderGlassPanel(config, width, height, dpr) {
+     if (this.contextLost) return;
+     const gl = this.gl;
+@@ -1663,9 +1663,9 @@
+     }
+     this.canvas.remove();
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // FBO management
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _setActiveSize(w, h) {
+     if (w <= 0 || h <= 0) return false;
+     this.width = w;
+@@ -1713,9 +1713,9 @@
+     this._freeFBO(fboSet.blurA);
+     this._freeFBO(fboSet.blurB);
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Shader helpers
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _compile(src, type) {
+     const gl = this.gl;
+     const s = gl.createShader(type);
+@@ -1765,17 +1765,17 @@
+ }
+ `;
+ var LiquidGlass = class _LiquidGlass {
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Constructor (prefer LiquidGlass.init)
+-  // ────────────────────────────────────────────
+-  constructor({ root, glassElements, defaults = {} }) {
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
++  constructor({ root, glassElements, defaults = {}, captureFilter = () => true, signal }) {
+     /** Current frames-per-second (updated every frame). */
+     this.fps = 0;
+     this._running = false;
+     this._rafId = 0;
+     this._hasDynamic = false;
+     /**
+-     * Genuinely-global dirty flag — set by events that legitimately
++     * Genuinely-global dirty flag â€” set by events that legitimately
+      * affect every glass at once (resize, WebGL context restored,
+      * structural mutation of root, end of _start). On the next frame
+      * the entry guard promotes it into per-element dirty marks for
+@@ -1789,7 +1789,7 @@
+      *
+      * Mirrors _glassContentDirty (which tracks html-to-image content
+      * captures) but for the WebGL shader pass instead of the DOM
+-     * raster pass — they have different triggers.
++     * raster pass â€” they have different triggers.
+      */
+     this._glassDirty = /* @__PURE__ */ new Set();
+     /**
+@@ -1828,6 +1828,8 @@
+     };
+     if (!root) throw new Error("LiquidGlass: `root` element is required.");
+     this.root = root;
++    this._captureFilter = captureFilter;
++    this._signal = signal;
+     this.defaults = { ...DEFAULTS, ...defaults };
+     this.glassSet = new Set(Array.from(glassElements || []));
+     this.glassCanvases = /* @__PURE__ */ new Map();
+@@ -1847,17 +1849,31 @@
+     this._onPointerMove = this._handlePointerMove.bind(this);
+     this._onPointerUp = this._handlePointerUp.bind(this);
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Static entry point
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   static async init(options) {
++    options.signal?.throwIfAborted();
+     const instance = new _LiquidGlass(options);
+-    await instance._start();
+-    return instance;
+-  }
+-  // ────────────────────────────────────────────
++    const abort = () => {
++      instance.destroy();
++      instance.renderer.gl.getExtension("WEBGL_lose_context")?.loseContext();
++    };
++    options.signal?.throwIfAborted();
++    options.signal?.addEventListener("abort", abort, { once: true });
++    try {
++      await instance._start();
++      return instance;
++    } catch (error) {
++      if (!options.signal?.aborted) abort();
++      throw error;
++    } finally {
++      options.signal?.removeEventListener("abort", abort);
++    }
++  }
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Lifecycle
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   async _start() {
+     this.root.style.userSelect = "none";
+     this.root.style.webkitUserSelect = "none";
+@@ -1865,9 +1881,14 @@
+     this._hasDynamic = this._detectDynamic();
+     this._sortedChildren = this._getSortedChildren();
+     this._handleResize();
++    this._geometryDirty = true;
++    this._sizeObserver = new ResizeObserver(() => { this._geometryDirty = true; });
++    for (const el of this.glassSet) this._sizeObserver.observe(el);
+     await this.capture.prefetchFontEmbedCSS();
++    this._signal?.throwIfAborted();
+     await this._captureGlassContent();
+     await this._prewarmStaticCaptures();
++    this._signal?.throwIfAborted();
+     window.addEventListener("resize", this._onResize);
+     this.root.addEventListener("pointerdown", this._onPointerDown);
+     window.addEventListener("pointermove", this._onPointerMove);
+@@ -1902,6 +1923,8 @@
+     this._glassContentDirty.clear();
+     this._running = true;
+     this._globalDirty = true;
++    // PresentaciÃ³n atÃ³mica antes de resolver init.
++    this._renderFrame();
+     this._rafId = requestAnimationFrame(() => this._renderLoop());
+   }
+   destroy() {
+@@ -1913,6 +1936,8 @@
+     this.root.removeEventListener("pointerdown", this._onPointerDown);
+     window.removeEventListener("pointermove", this._onPointerMove);
+     window.removeEventListener("pointerup", this._onPointerUp);
++    this._sizeObserver?.disconnect();
++    this._sizeObserver = null;
+     this._observer?.disconnect();
+     this._observer = null;
+     this._glassSubtreeObserver?.disconnect();
+@@ -1937,9 +1962,9 @@
+     this.capture.destroy();
+     this.renderer.destroy();
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Glass element setup
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _setupGlassElements() {
+     let needsButtonStyles = false;
+     for (const el of this.glassSet) {
+@@ -1997,7 +2022,7 @@
+    * frame.
+    *
+    * `rectOverride` lets callers pass a rect that differs from the
+-   * element's current bounding box — useful for drag, where we
++   * element's current bounding box â€” useful for drag, where we
+    * want to invalidate both the *old* and *new* footprints in the
+    * same call so glasses behind the dragged panel can clear its
+    * trail and glasses ahead can pick up its new shadow.
+@@ -2066,7 +2091,7 @@
+   /**
+    * Public API: mark an element (or all glass elements when called
+    * with no arguments) as needing a shader re-render on the next
+-   * frame. Useful for content the library can't observe on its own —
++   * frame. Useful for content the library can't observe on its own â€”
+    * a `<canvas>` whose pixels you just updated, an `<img>` you just
+    * swapped via JS, a wrapper whose CSS background-image you just
+    * changed, etc.
+@@ -2120,9 +2145,9 @@
+       () => el.removeEventListener("pointercancel", onUp)
+     ]);
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Glass content pre-capture
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   /**
+    * Re-capture the DOM content (text, icons, etc.) of glass elements
+    * whose subtrees have been mutated since the last capture, hiding
+@@ -2135,12 +2160,20 @@
+    * running, the affected elements stay in `_glassContentDirty` and
+    * the next render-loop tick picks them up.
+    */
++  needsSnapshot(element) {
++    return this._captureFilter(element, this._sortedChildren, this.glassSet);
++  }
+   async _captureGlassContent(targets = null) {
+     if (this._capturingGlassContent) return;
+     this._capturingGlassContent = true;
+     try {
+       for (const [el, glassCanvas] of this.glassCanvases) {
++        this._signal?.throwIfAborted();
+         if (targets && !targets.has(el)) continue;
++        if (!this.needsSnapshot(el)) {
++          this._glassContentImages.delete(el);
++          continue;
++        }
+         const rect = el.getBoundingClientRect();
+         const img = await this.capture.captureToCanvas(
+           el,
+@@ -2165,7 +2198,9 @@
+    */
+   async _prewarmStaticCaptures() {
+     for (const child of this._sortedChildren) {
++      this._signal?.throwIfAborted();
+       if (this.glassSet.has(child)) continue;
++      if (!this.needsSnapshot(child)) continue;
+       const tag = child.tagName;
+       if (tag === "CANVAS" || tag === "IMG" || tag === "VIDEO") continue;
+       if (child.hasAttribute("data-dynamic")) continue;
+@@ -2176,9 +2211,9 @@
+       }
+     }
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Child ordering & stacking context
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _getSortedChildren() {
+     const children = Array.from(this.root.children);
+     const rootDisplay = window.getComputedStyle(this.root).display;
+@@ -2201,13 +2236,13 @@
+     return tagged.map((t) => t.el);
+   }
+   /**
+-   * Returns true when the element forms a CSS stacking context — i.e.
++   * Returns true when the element forms a CSS stacking context â€” i.e.
+    * when its z-index participates in painting order. Mirrors the spec:
+    * https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_positioned_layout/Stacking_context
+    *
+    * Used by `_getSortedChildren` to decide painting order for the
+    * local scene assembly. The set of triggers needs to match the
+-   * browser's actual stacking model — otherwise overlays end up
++   * browser's actual stacking model â€” otherwise overlays end up
+    * painted before the background image and get erased.
+    */
+   static _formsStackingContext(style, isFlexOrGridParent) {
+@@ -2261,9 +2296,9 @@
+     }
+     return false;
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Configuration
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _getConfig(el) {
+     const cachedEl = el;
+     const configKey = el.dataset.config ?? "";
+@@ -2298,9 +2333,9 @@
+     }
+     return config;
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Resize
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _handleResize() {
+     const dpr = window.devicePixelRatio || 1;
+     const rect = this.root.getBoundingClientRect();
+@@ -2350,9 +2385,9 @@
+     }
+     return changed;
+   }
+-  // ────────────────────────────────────────────
+-  // Floating (drag) behaviour — Pointer Events
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
++  // Floating (drag) behaviour â€” Pointer Events
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   /** Parse the current translate(x, y) values from an element's transform. */
+   static _getTranslateXY(el) {
+     const style = getComputedStyle(el);
+@@ -2443,9 +2478,9 @@
+     this._drag.element = null;
+     this._markGlassAndDependents(dragged);
+   }
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   // Render loop
+-  // ────────────────────────────────────────────
++  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   _renderLoop() {
+     if (!this._running) return;
+     const now = performance.now();
+@@ -2455,7 +2490,9 @@
+       this._fpsFrames = 0;
+       this._fpsTime = now;
+     }
+-    if (this._checkGlassSizeChanges()) {
++    if (this._geometryDirty) {
++      this._geometryDirty = false;
++      this._checkGlassSizeChanges();
+     }
+     if (this._glassContentDirty.size > 0 && !this._capturingGlassContent) {
+       const targets = new Set(this._glassContentDirty);
+@@ -2470,6 +2507,8 @@
+     this._rafId = requestAnimationFrame(() => this._renderLoop());
+   }
+   _renderFrame() {
++    // Sin invalidaciones no se consulta el layout ni se compone otra textura.
++    if (!this._globalDirty && !this._glassDirty.size && !this._userMarkedChanged.size && !this._hasDynamic && !this._drag.active) return;
+     const dpr = window.devicePixelRatio || 1;
+     const rootRect = this.root.getBoundingClientRect();
+     const isDragging = this._drag.active;
+@@ -2618,6 +2657,7 @@
+   }
+   _drawNonGlassChildToScene(child, sampleRect, rootRect, dpr) {
+     const tag = child.tagName;
++    if (!this.needsSnapshot(child)) return;
+     if (tag === "CANVAS" || tag === "IMG" || tag === "VIDEO") {
+       this._drawMediaElement(child, this._sceneCtx, sampleRect, rootRect, dpr);
+       return;
+diff --git a/node_modules/@ybouane/liquidglass/dist/LiquidGlass.d.ts b/node_modules/@ybouane/liquidglass/dist/LiquidGlass.d.ts
+--- a/node_modules/@ybouane/liquidglass/dist/LiquidGlass.d.ts
++++ b/node_modules/@ybouane/liquidglass/dist/LiquidGlass.d.ts
+@@ -23,6 +23,8 @@
+     glassElements?: NodeListOf<HTMLElement> | HTMLElement[];
+     /** Override the default configuration values. */
+     defaults?: Partial<GlassConfig>;
++    captureFilter?: (element: HTMLElement, orderedChildren: HTMLElement[], glassSet: Set<HTMLElement>) => boolean;
++    signal?: AbortSignal;
+ }
+ interface ObjectFitRect {
+     sx: number;
+@@ -97,6 +99,7 @@
+     constructor({ root, glassElements, defaults }: LiquidGlassOptions);
+     private _start;
+     destroy(): void;
++    needsSnapshot(element: HTMLElement): boolean;
+     private _setupGlassElements;
+     /**
+      * Walk up from a mutation target until we hit a glass element

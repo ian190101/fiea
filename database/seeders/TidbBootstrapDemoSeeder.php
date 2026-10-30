@@ -30,6 +30,7 @@ class TidbBootstrapDemoSeeder extends Seeder
 {
     public function run(): void
     {
+        abort_unless(app()->environment(['local','testing']), 403, 'Los datos demo solo se permiten en desarrollo.');
         $password = env('FIEA_BOOTSTRAP_ADMIN_PASSWORD');
 
         if (! is_string($password) || mb_strlen($password) < 14) {

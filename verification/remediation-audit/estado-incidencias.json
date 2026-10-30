@@ -1,0 +1,2266 @@
+[
+  {
+    "id": "ERR-001",
+    "titulo": "La lectura del control XLSX aborta por precisión decimal de Excel",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-002",
+    "titulo": "El controlador de presupuesto y su interfaz no comparten página ni contrato",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-003",
+    "titulo": "Las líneas IC nuevas no permiten introducir cantidades diarias desde la matriz",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-004",
+    "titulo": "MAT descarta la descripción inglesa del material capturado",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-005",
+    "titulo": "Aprobar Initial bloquea agregar gastos nuevos que solo corresponden a Final",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-006",
+    "titulo": "La invoice PDF imprime cantidad de celdas en lugar de cantidad consumida y omite el costo unitario",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-007",
+    "titulo": "La invoice PDF omite datos de cabecera que el sistema exige capturar",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-008",
+    "titulo": "Completar la matriz Final impide generar el Draft PDF si aún no existe Initial aprobado",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-009",
+    "titulo": "El Draft PDF pierde los recibos diarios de IC Final",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-010",
+    "titulo": "La primera devolución parcial bloquea devolver el resto del mismo cobro",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-011",
+    "titulo": "Una referencia repetida puede asociar la devolución al cobro de otra etapa",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-012",
+    "titulo": "Una devolución puede descontar crédito previo que no generó ese expediente",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-013",
+    "titulo": "Las expectativas FIEA aceptan documentos de otra etapa o anulados como fundamento",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-014",
+    "titulo": "POR GASTAR se habilita con un cobro que ya se devolvió por completo",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-015",
+    "titulo": "La revisión contable guardada no se refleja en las columnas del control",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-016",
+    "titulo": "La lista contable no proporciona el enlace para revisar un registro existente",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-017",
+    "titulo": "Los filtros contables siguen leyendo el estado legado de la invoice",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-018",
+    "titulo": "El resumen ignora el filtro de estado y limita sus contadores a una página",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-019",
+    "titulo": "El control expone una revisión conjunta que la política del usuario prohíbe ver",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-020",
+    "titulo": "El cierre busca la revisión por año de emisión y no por el año utilizado en el control",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-021",
+    "titulo": "Un importe contable fuera de rango supera la validación y produce HTTP 500",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-022",
+    "titulo": "La pantalla de importación no cumple el contrato de previsualización ni aplicación",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-023",
+    "titulo": "Las filas posteriores a la número 100 no se pueden alcanzar desde la previsualización",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-024",
+    "titulo": "Los marcadores PENDIENTE del Excel se convierten en errores que no se pueden resolver",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 1,
+        "aserciones": 1
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-025",
+    "titulo": "La identificación parcial descarta códigos sin resolver o fuera de la jurisdicción",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-026",
+    "titulo": "El tipo IC/MAT y la modalidad de facturación del origen no se contrastan con el destino",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-027",
+    "titulo": "La importación omite restricciones y actualizaciones de crédito del servicio de tesorería",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-028",
+    "titulo": "Importar contabilidad de 2025 exige permiso de pagos aunque no se vaya a registrar caja",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-029",
+    "titulo": "Cambiar el perfil regional no actualiza una previsualización ya existente",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-030",
+    "titulo": "Un archivo corregido puede registrar otra vez el mismo pago con un importe diferente",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/importacion.xml",
+        "casos": 20,
+        "aserciones": 52
+      },
+      {
+        "archivo": "verification/remediation-audit/importacion-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-031",
+    "titulo": "El enlace CSV usa navegación Inertia y no entrega la descarga",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-032",
+    "titulo": "El crédito compartido se repite en las filas sin identificarlo como medida no aditiva",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-033",
+    "titulo": "La columna difference del CSV representa otra diferencia distinta de la pantalla",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-034",
+    "titulo": "Las alertas de control financiero solo revisan la primera página de expedientes",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-035",
+    "titulo": "Una obligación vencida sin ningún pago queda fuera de la alerta de control",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-036",
+    "titulo": "Las líneas nuevas de la matriz Final no tienen acceso al flujo de archivos de respaldo",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-037",
+    "titulo": "Aprobar el Initial congela también los comprobantes del Final todavía abierto",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-038",
+    "titulo": "Los indicadores de gastos y comprobantes esperan resúmenes que los controladores no entregan",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-039",
+    "titulo": "Los selectores de gastos y comprobantes excluyen registros después del límite de 25",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-040",
+    "titulo": "El segundo guardado de una celda diaria falla en el SQLite configurado",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-041",
+    "titulo": "El enlace de matriz de una fase nueva termina en 404 sin iniciar su expediente",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-042",
+    "titulo": "El selector excluye técnicos activos que todavía no tienen una fase asignada",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-043",
+    "titulo": "El backend acepta como técnico usuarios inactivos o sin el rol que exige la interfaz",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-044",
+    "titulo": "Recortar un día vacío deja una celda fuera de rango que impide emitir el Final",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-045",
+    "titulo": "Cancelar el viaje bloquea la matriz pero deja emitir y aprobar sus facturas",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-046",
+    "titulo": "Trasladar un equipo deja sus contactos asignados al capítulo anterior",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-047",
+    "titulo": "La pantalla de equipos no recibe el crédito confirmado de su cuenta financiera",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-048",
+    "titulo": "Los cursores de capítulos y equipos interfieren entre sí",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-049",
+    "titulo": "Los selectores de facturación exponen contactos exclusivos de otros equipos del capítulo",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-050",
+    "titulo": "La automatización no obtiene destinatarios de una factura aprobada por el flujo normal",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/correos.xml",
+        "casos": 15,
+        "aserciones": 56
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-051",
+    "titulo": "Las plantillas usan la cabecera actual del catálogo en vez de la factura aprobada",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/correos.xml",
+        "casos": 15,
+        "aserciones": 56
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-052",
+    "titulo": "Un fallo local anterior a HTTP se clasifica como entrega desconocida y queda bloqueado",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/correos.xml",
+        "casos": 15,
+        "aserciones": 56
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-053",
+    "titulo": "Los vencimientos detienen lotes válidos y dejan eventos que vuelven a despacharse",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/correos.xml",
+        "casos": 15,
+        "aserciones": 56
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-054",
+    "titulo": "El historial expone destinatarios BCC a usuarios de lectura",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/correos.xml",
+        "casos": 15,
+        "aserciones": 56
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-055",
+    "titulo": "La entrega no verifica los bytes del adjunto contra su hash congelado",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/correos.xml",
+        "casos": 15,
+        "aserciones": 56
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-056",
+    "titulo": "El cursor de notificaciones omite eventos que tienen la misma fecha",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-057",
+    "titulo": "La bandeja reemplaza el resumen compartido de notificaciones y oculta el indicador de no leídas",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-058",
+    "titulo": "Los viajes cancelados generan tareas de preparación y desplazan viajes vigentes",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-059",
+    "titulo": "Las entregas de correo desconocidas quedan fuera del centro de alertas",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-060",
+    "titulo": "Los borradores anulados siguen generando una alerta de PDF pendiente",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-061",
+    "titulo": "Los filtros de severidad y búsqueda se aplican después de descartar incidencias por el límite de 40",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-062",
+    "titulo": "Los comparadores de alertas no respetan la prioridad por severidad y fecha",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-063",
+    "titulo": "La pantalla de usuarios no permite configurar el alcance que requieren las cuentas nuevas",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-064",
+    "titulo": "La validación de ámbito rechaza listas vacías y bloquea la revocación completa",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-065",
+    "titulo": "La protección del último superadmin no garantiza que quede un administrador operativo",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-066",
+    "titulo": "El cambio de ámbito utiliza un actor desactualizado después de su revocación",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-067",
+    "titulo": "El alta admite mayúsculas que el login no puede recuperar en el SQLite configurado",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-068",
+    "titulo": "Recuperar la contraseña no invalida una sesión anterior con el controlador de archivos",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-069",
+    "titulo": "Se aceptan contraseñas distintas cuyo contenido después del byte 72 no participa en el cotejo bcrypt",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-070",
+    "titulo": "Administrar respaldos permite generarlos, pero su descarga exige otro permiso",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/configuracion.xml",
+        "casos": 12,
+        "aserciones": 128
+      },
+      {
+        "archivo": "verification/remediation-audit/sqlite-snapshot.xml",
+        "casos": 2,
+        "aserciones": 8
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-071",
+    "titulo": "Se ofrece generar respaldos en el SQLite local, pero el único escritor admite MySQL",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/configuracion.xml",
+        "casos": 12,
+        "aserciones": 128
+      },
+      {
+        "archivo": "verification/remediation-audit/sqlite-snapshot.xml",
+        "casos": 2,
+        "aserciones": 8
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-072",
+    "titulo": "El aviso de un respaldo fallido puede sustituir la respuesta controlada por un error 500",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/configuracion.xml",
+        "casos": 12,
+        "aserciones": 128
+      },
+      {
+        "archivo": "verification/remediation-audit/sqlite-snapshot.xml",
+        "casos": 2,
+        "aserciones": 8
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-073",
+    "titulo": "Las dos reglas financieras de configuración se guardan sin aplicar lo que anuncia la pantalla",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/configuracion.xml",
+        "casos": 12,
+        "aserciones": 128
+      },
+      {
+        "archivo": "verification/remediation-audit/sqlite-snapshot.xml",
+        "casos": 2,
+        "aserciones": 8
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-074",
+    "titulo": "Reemplazar el logo en el mismo segundo reutiliza una URL declarada inmutable durante un año",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/configuracion.xml",
+        "casos": 12,
+        "aserciones": 128
+      },
+      {
+        "archivo": "verification/remediation-audit/sqlite-snapshot.xml",
+        "casos": 2,
+        "aserciones": 8
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-075",
+    "titulo": "Paginar el historial descarta los filtros y mezcla eventos que no coinciden",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-076",
+    "titulo": "Cambios del expediente, matriz y contabilidad quedan invisibles para otros revisores del mismo ámbito",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-077",
+    "titulo": "El historial de matriz omite los valores sustituidos y no permite reconstruir una captura anterior",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-078",
+    "titulo": "Actualizar un proyecto genera un evento sin sus cambios y con una versión constante",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-079",
+    "titulo": "Cambiar la fecha de un recibo convierte ambas fechas del historial en null",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-080",
+    "titulo": "Eliminar un proyecto no deja un evento de eliminación en el historial",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-finales-frontend.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/inertia-real.json",
+        "casos": 4
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-081",
+    "titulo": "Cambiar el país de una comunidad deja proyectos vinculados con otro país",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-082",
+    "titulo": "El cero inicial del formulario de categorías no cumple el tipo exigido por el servidor",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-083",
+    "titulo": "El límite de porcentaje permite superar 100 por la parte decimal",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-084",
+    "titulo": "Se aceptan cuatro decimales de comisión, pero la lectura del catálogo solo devuelve dos",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-085",
+    "titulo": "La pantalla ofrece escritura a lectores y gestores sin alcance global aunque sus peticiones se rechazan",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/reportes-panel-catalogos.xml",
+        "casos": 43,
+        "aserciones": 271
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-086",
+    "titulo": "Un fallo de caché puede impedir el diagnóstico que debería comunicarlo",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/operaciones.xml",
+        "casos": 16,
+        "aserciones": 64
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-087",
+    "titulo": "Los latidos exigidos no se publican en el flujo revisado y su comprobación no valida antigüedad",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/operaciones.xml",
+        "casos": 16,
+        "aserciones": 64
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-088",
+    "titulo": "La sonda de almacenamiento anuncia lectura sin leer y omite el fallo de limpieza",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/operaciones.xml",
+        "casos": 16,
+        "aserciones": 64
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-089",
+    "titulo": "Los chequeos de cola ignoran las tablas configuradas y pueden ocultar una cola averiada o fallos existentes",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/operaciones.xml",
+        "casos": 16,
+        "aserciones": 64
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-090",
+    "titulo": "Un respaldo reciente sin archivo conserva estado operativo correcto",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/operaciones.xml",
+        "casos": 16,
+        "aserciones": 64
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-091",
+    "titulo": "La ausencia de APP_KEY no bloquea el comando predeterminado aunque el cifrado no pueda funcionar",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/operaciones.xml",
+        "casos": 16,
+        "aserciones": 64
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-092",
+    "titulo": "El autoborrado con referencias financieras termina en error 500 después de cerrar la sesión",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-093",
+    "titulo": "Cambiar la contraseña conserva una cookie antigua de recordarme capaz de autenticar una sesión nueva",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-094",
+    "titulo": "Una edición bloqueada por cambio obligatorio de clave devuelve éxito de navegación sin guardar los datos",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-095",
+    "titulo": "Perfil y administración admiten identificadores que el otro flujo rechaza sin modificarlos",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-096",
+    "titulo": "Los perfiles ópticos conservan cadenas válidas para el servidor que cambian su significado en el cliente",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-097",
+    "titulo": "El inicializador anterior a React no aplica el tema esperado bajo CSP ni resuelve system oscuro",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/acceso.xml",
+        "casos": 16,
+        "aserciones": 76
+      },
+      {
+        "archivo": "verification/remediation-audit/perfil.xml",
+        "casos": 17,
+        "aserciones": 159
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia.xml",
+        "casos": 9,
+        "aserciones": 60
+      },
+      {
+        "archivo": "verification/remediation-audit/controles-nuevos.xml",
+        "casos": 6,
+        "aserciones": 34
+      },
+      {
+        "archivo": "verification/remediation-audit/apariencia-frontend.json",
+        "casos": 10
+      },
+      {
+        "archivo": "verification/remediation-audit/ambito-frontend.json",
+        "casos": 3
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-098",
+    "titulo": "Fechas españolas del control sin normalización ni resolución",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/facturacion.xml",
+        "casos": 12,
+        "aserciones": 29
+      },
+      {
+        "archivo": "verification/remediation-audit/tesoreria.xml",
+        "casos": 12,
+        "aserciones": 47
+      },
+      {
+        "archivo": "verification/remediation-audit/contabilidad.xml",
+        "casos": 12,
+        "aserciones": 37
+      },
+      {
+        "archivo": "verification/remediation-audit/integral.xml",
+        "casos": 16,
+        "aserciones": 184
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-099",
+    "titulo": "Dependencias PHP con avisos de seguridad vigentes",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/dependencias-verificadas.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  },
+  {
+    "id": "ERR-100",
+    "titulo": "Dependencias JavaScript con avisos de seguridad vigentes",
+    "estado": "subsanado_y_verificado",
+    "verificacion": [
+      {
+        "archivo": "verification/remediation-audit/dependencias-verificadas.json",
+        "casos": 4
+      },
+      {
+        "archivo": "verification/remediation-audit/actual.xml",
+        "casos": 268,
+        "aserciones": 1507
+      },
+      {
+        "archivo": "verification/remediation-audit/existente-actual.xml",
+        "casos": 249,
+        "aserciones": 1107
+      }
+    ],
+    "validacion_final": "verification/remediation-audit/auditoria-final.json"
+  }
+]

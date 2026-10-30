@@ -16,7 +16,7 @@ class CreateDatabaseBackup extends Command
         $backup = $backups->create();
 
         if ($backup->status === 'failed') {
-            $this->error('No se pudo generar el backup: '.$backup->error_message);
+            $this->error('No se pudo generar el backup. Referencia: '.$backup->error_message);
 
             return self::FAILURE;
         }

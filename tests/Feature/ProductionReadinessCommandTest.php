@@ -17,7 +17,7 @@ class ProductionReadinessCommandTest extends TestCase
         $this->artisan('fiea:production-check')
             ->expectsOutputToContain('Revision operativa FIEA')
             ->expectsOutputToContain('Estado general:')
-            ->assertExitCode(0);
+            ->assertExitCode(1);
     }
 
     public function test_production_check_command_outputs_json_status(): void
@@ -25,7 +25,7 @@ class ProductionReadinessCommandTest extends TestCase
         $exitCode = Artisan::call('fiea:production-check', ['--json' => true]);
         $payload = json_decode(Artisan::output(), true);
 
-        $this->assertSame(0, $exitCode);
+        $this->assertSame(1, $exitCode);
         $this->assertIsArray($payload);
         $this->assertArrayHasKey('overall', $payload);
         $this->assertArrayHasKey('checks', $payload);

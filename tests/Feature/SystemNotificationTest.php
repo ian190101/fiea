@@ -109,6 +109,7 @@ class SystemNotificationTest extends TestCase
         ]);
         $role->permissions()->attach($permission);
         $user = User::factory()->create();
+        $user->forceFill(['scope_all' => true])->save();
         $user->roles()->attach($role);
 
         return $user;

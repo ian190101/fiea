@@ -1,0 +1,110 @@
+{
+  "navegador": "Chrome 155.0.8059.85",
+  "modo": "headless, contextos temporales",
+  "navegacion": "Solo auditoria.invalid con todas las respuestas interceptadas; demás solicitudes abortadas",
+  "casos": 10,
+  "conformes": 10,
+  "fallos_contrato": 0,
+  "errores_ejecucion": 0,
+  "resultados": [
+    {
+      "nombre": "cadenas validadas mantienen semántica numérica y booleana en el motor real",
+      "observado": {
+        "boton_publicado": false,
+        "tipo_boton": "boolean",
+        "brillo_publicado": 0.1,
+        "brillo_hover": 0.1,
+        "brillo_finito": true,
+        "flotante_publicado": false
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "control con números y booleanos tipados produce brillo válido",
+      "observado": {
+        "brillo_hover": 0.30000000000000004,
+        "brillo_finito": true
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "inicializador real aplica tema oscuro con CSP de producción",
+      "observado": {
+        "oscuro": true,
+        "color_scheme": "dark",
+        "violaciones": []
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "control de nonce permite ejecutar el mismo inicializador",
+      "observado": {
+        "oscuro": true,
+        "violaciones": 0
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "inicializador real resuelve system oscuro antes de cargar React",
+      "observado": {
+        "sistema_oscuro": true,
+        "oscuro": true,
+        "color_scheme": "dark"
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "applyTheme original sigue el sistema y retira el listener al elegir tema explícito",
+      "observado": {
+        "tema_final": "light"
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "preferencias originales toleran localStorage bloqueado",
+      "observado": {
+        "lectura": "light",
+        "escritura": false
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "ThemeToggle real aplica tema y solicita persistencia al recibir 204",
+      "observado": {
+        "oscuro": true,
+        "preferencia_local": "dark",
+        "preferencia_servidor_simulado": "dark",
+        "switch_activo": "true",
+        "peticiones": 1
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "ThemeToggle real revierte DOM y preferencia si falla PATCH",
+      "observado": {
+        "oscuro": false,
+        "preferencia_local": "light",
+        "preferencia_servidor_simulado": "light",
+        "switch_activo": "false",
+        "peticiones": 1
+      },
+      "estado": "conforme"
+    },
+    {
+      "nombre": "ThemeToggle real no conserva un tema no guardado ante redirección HTML de bloqueo",
+      "observado": {
+        "oscuro": false,
+        "preferencia_local": "light",
+        "preferencia_servidor_simulado": "light",
+        "switch_activo": "false",
+        "peticiones": 1
+      },
+      "estado": "conforme"
+    }
+  ],
+  "limites": [
+    "Contexto Inertia y respuestas axios simulados en pruebas de ThemeToggle",
+    "Se ejecutan código React, utilidades y cálculo del motor originales",
+    "No certifica el shader WebGL, capturas completas ni rendimiento GPU"
+  ]
+}

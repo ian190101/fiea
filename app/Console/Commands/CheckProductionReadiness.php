@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Console\Commands;
 
@@ -15,7 +16,8 @@ class CheckProductionReadiness extends Command
 
     public function handle(OperationHealthService $health): int
     {
-        $status = $health->status();
+        // La verificación de despliegue debe observar el estado actual, no la caché operativa.
+        $status = $health->status(fresh: true);
 
         if ($this->option('json')) {
             $this->line(json_encode($status, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));

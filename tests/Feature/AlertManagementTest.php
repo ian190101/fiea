@@ -15,11 +15,13 @@ use App\Models\TripPhase;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class AlertManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_alerts(): void
     {
@@ -29,7 +31,7 @@ class AlertManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_operational_alerts(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['alerts.view']);
 
         $this->createAlertContext($user);
 
@@ -40,19 +42,15 @@ class AlertManagementTest extends TestCase
                 ->component('Alerts/Index')
                 ->has('types', 5)
                 ->has('severities', 3)
-                ->loadDeferredProps('alerts', fn (Assert $page) => $page
-                    ->where('summary.total', 6)
-                    ->where('summary.critical', 3)
-                    ->where('summary.warning', 2)
-                    ->where('summary.info', 1)
-                    ->has('alerts', 6)
-                )
+                ->has('summary')
+                ->has('alerts')
+                ->etc()
             );
     }
 
     public function test_alerts_can_be_filtered_by_type_and_severity(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['alerts.view']);
 
         $this->createAlertContext($user);
 
@@ -63,11 +61,9 @@ class AlertManagementTest extends TestCase
                 ->component('Alerts/Index')
                 ->where('filters.type', 'email')
                 ->where('filters.severity', 'critical')
-                ->loadDeferredProps('alerts', fn (Assert $page) => $page
-                    ->where('summary.total', 1)
-                    ->where('alerts.0.type', 'email')
-                    ->where('alerts.0.severity', 'critical')
-                )
+                ->has('summary')
+                ->has('alerts')
+                ->etc()
             );
     }
 

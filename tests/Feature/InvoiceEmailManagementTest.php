@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
+use App\Models\BillingCase;
 use App\Models\Chapter;
 use App\Models\ChapterType;
 use App\Models\ContactPerson;
@@ -11,7 +12,9 @@ use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Invoice;
 use App\Models\InvoiceRecipient;
+use App\Models\OutboxEvent;
 use App\Models\Project;
+use App\Models\StorageFile;
 use App\Models\Team;
 use App\Models\TripPhase;
 use App\Models\User;
@@ -21,11 +24,19 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class InvoiceEmailManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config()->set('services.resend.idempotency_window_seconds', 3600);
+    }
 
     public function test_guests_are_redirected_from_invoice_emails(): void
     {
@@ -35,7 +46,7 @@ class InvoiceEmailManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_invoice_emails(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
 
         $this->actingAs($user)
             ->get('/correos-invoices')
@@ -44,7 +55,7 @@ class InvoiceEmailManagementTest extends TestCase
 
     public function test_invoice_email_uses_configured_template_defaults(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice] = $this->createInvoiceContext();
         EmailTemplate::query()->create([
             'name' => 'Custom IC Initial',
@@ -70,7 +81,7 @@ class InvoiceEmailManagementTest extends TestCase
 
     public function test_authenticated_users_can_prepare_invoice_email(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice, $contact] = $this->createInvoiceContext();
 
         $this->actingAs($user)
@@ -93,12 +104,10 @@ class InvoiceEmailManagementTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
-        $this->assertDatabaseHas('invoice_recipients', [
-            'invoice_id' => $invoice->id,
-            'contact_person_id' => $contact->id,
-            'email' => 'billing@example.com',
-            'recipient_type' => 'to',
-        ]);
+        $prepared = EmailLog::query()->firstOrFail();
+        $this->assertSame('billing@example.com', $prepared->recipients_snapshot[0]['email']);
+        $this->assertSame('to', $prepared->recipients_snapshot[0]['recipient_type']);
+        $this->assertNotNull($prepared->delivery_key);
         $this->assertDatabaseHas('email_logs', [
             'invoice_id' => $invoice->id,
             'subject' => 'FIEA IC Initial Invoice',
@@ -108,14 +117,14 @@ class InvoiceEmailManagementTest extends TestCase
             'user_id' => $user->id,
             'action' => 'invoice_email_prepared',
             'module' => 'emails',
-            'auditable_type' => Invoice::class,
-            'auditable_id' => $invoice->id,
+            'auditable_type' => EmailLog::class,
+            'auditable_id' => $prepared->id,
         ]);
     }
 
     public function test_invoice_email_requires_at_least_one_to_recipient(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice] = $this->createInvoiceContext();
 
         $this->actingAs($user)
@@ -135,9 +144,9 @@ class InvoiceEmailManagementTest extends TestCase
         $this->assertDatabaseCount('email_logs', 0);
     }
 
-    public function test_preparing_email_replaces_previous_invoice_recipients(): void
+    public function test_preparaciones_conservan_destinatarios_inmutables(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice, $contact] = $this->createInvoiceContext();
 
         $this->actingAs($user)
@@ -160,21 +169,16 @@ class InvoiceEmailManagementTest extends TestCase
             ])
             ->assertSessionHasNoErrors();
 
-        $this->assertDatabaseMissing('invoice_recipients', [
-            'invoice_id' => $invoice->id,
-            'email' => 'first@example.com',
-        ]);
-        $this->assertDatabaseHas('invoice_recipients', [
-            'invoice_id' => $invoice->id,
-            'email' => 'billing@example.com',
-        ]);
-        $this->assertSame(2, EmailLog::query()->count());
+        $logs = EmailLog::query()->orderBy('id')->get();
+        $this->assertCount(2, $logs);
+        $this->assertSame('first@example.com', $logs[0]->recipients_snapshot[0]['email']);
+        $this->assertSame('billing@example.com', $logs[1]->recipients_snapshot[0]['email']);
         $this->assertSame(2, AuditLog::query()->where('module', 'emails')->count());
     }
 
     public function test_authenticated_users_can_create_email_template(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
 
         $this->actingAs($user)
             ->post(route('email-templates.store'), [
@@ -203,7 +207,7 @@ class InvoiceEmailManagementTest extends TestCase
 
     public function test_authenticated_users_can_update_email_template(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         $template = EmailTemplate::query()->create([
             'name' => 'IC Initial',
             'invoice_type' => 'IC',
@@ -245,19 +249,10 @@ class InvoiceEmailManagementTest extends TestCase
         Queue::fake();
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice, $contact] = $this->createInvoiceContext();
-        InvoiceRecipient::query()->create([
-            'invoice_id' => $invoice->id,
-            'contact_person_id' => $contact->id,
-            'email' => 'billing@example.com',
-            'recipient_type' => 'to',
-        ]);
-        $emailLog = EmailLog::query()->create([
-            'invoice_id' => $invoice->id,
-            'subject' => 'FIEA Invoice',
-            'body' => 'Hello, please find the invoice attached.',
-            'status' => 'pending',
+        $emailLog = $this->preparedLog($invoice, [
+            ['email' => 'billing@example.com', 'recipient_type' => 'to'],
         ]);
 
         $this->actingAs($user)
@@ -265,7 +260,8 @@ class InvoiceEmailManagementTest extends TestCase
             ->assertSessionHasNoErrors()
             ->assertRedirect();
 
-        Queue::assertPushed(SendInvoiceEmailJob::class);
+        Queue::assertNotPushed(SendInvoiceEmailJob::class);
+        $this->assertDatabaseHas('outbox_events', ['dedup_key' => 'invoice-email:'.$emailLog->delivery_key]);
         $this->assertSame('queued', $emailLog->refresh()->status);
     }
 
@@ -277,25 +273,21 @@ class InvoiceEmailManagementTest extends TestCase
         config(['services.resend.key' => 're_test_key']);
         Storage::fake('local');
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice, $contact] = $this->createInvoiceContext();
-        InvoiceRecipient::query()->create([
-            'invoice_id' => $invoice->id,
-            'contact_person_id' => $contact->id,
-            'email' => 'billing@example.com',
-            'recipient_type' => 'to',
+        $emailLog = $this->preparedLog($invoice, [
+            ['email' => 'billing@example.com', 'recipient_type' => 'to'],
         ]);
-        $emailLog = EmailLog::query()->create([
-            'invoice_id' => $invoice->id,
-            'subject' => 'FIEA Invoice',
-            'body' => 'Hello, please find the invoice attached.',
-            'status' => 'queued',
+        $event = OutboxEvent::query()->create([
+            'dedup_key' => 'invoice-email:'.$emailLog->delivery_key,
+            'type' => 'invoice-email', 'aggregate_id' => $emailLog->id,
+            'payload' => ['email_log_id' => $emailLog->id], 'status' => 'pending',
+            'available_at' => now(),
         ]);
+        $emailLog->forceFill(['status' => 'queued'])->save();
 
-        (new SendInvoiceEmailJob($emailLog->id, $user->id))->handle(
-            app(\App\Services\InvoicePdfService::class),
-            app(\App\Services\InvoiceEmailDeliveryService::class),
-        );
+        (new SendInvoiceEmailJob($emailLog->id, $user->id, null, null, $event->id))
+            ->handle(app(\App\Services\InvoiceEmailDeliveryService::class));
 
         Http::assertSent(fn ($request) => $request->url() === 'https://api.resend.com/emails'
             && $request['to'] === ['billing@example.com']
@@ -316,30 +308,22 @@ class InvoiceEmailManagementTest extends TestCase
         ]);
     }
 
-    public function test_sending_email_without_to_recipient_marks_log_as_failed(): void
+    public function test_correo_sin_to_se_encola_para_validacion_del_despacho(): void
     {
         Queue::fake();
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice] = $this->createInvoiceContext();
-        InvoiceRecipient::query()->create([
-            'invoice_id' => $invoice->id,
-            'contact_person_id' => null,
-            'email' => 'copy@example.com',
-            'recipient_type' => 'cc',
-        ]);
-        $emailLog = EmailLog::query()->create([
-            'invoice_id' => $invoice->id,
-            'subject' => 'FIEA Invoice',
-            'body' => 'Hello.',
-            'status' => 'pending',
+        $emailLog = $this->preparedLog($invoice, [
+            ['email' => 'copy@example.com', 'recipient_type' => 'cc'],
         ]);
 
         $this->actingAs($user)
             ->post(route('invoice-emails.send', $emailLog->id))
             ->assertSessionHasNoErrors();
 
-        Queue::assertPushed(SendInvoiceEmailJob::class);
+        Queue::assertNotPushed(SendInvoiceEmailJob::class);
+        $this->assertDatabaseHas('outbox_events', ['dedup_key' => 'invoice-email:'.$emailLog->delivery_key]);
         $this->assertSame('queued', $emailLog->refresh()->status);
     }
 
@@ -347,26 +331,22 @@ class InvoiceEmailManagementTest extends TestCase
     {
         Http::fake();
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice] = $this->createInvoiceContext();
-        InvoiceRecipient::query()->create([
-            'invoice_id' => $invoice->id,
-            'contact_person_id' => null,
-            'email' => 'copy@example.com',
-            'recipient_type' => 'cc',
+        $emailLog = $this->preparedLog($invoice, [
+            ['email' => 'copy@example.com', 'recipient_type' => 'cc'],
         ]);
-        $emailLog = EmailLog::query()->create([
-            'invoice_id' => $invoice->id,
-            'subject' => 'FIEA Invoice',
-            'body' => 'Hello.',
-            'status' => 'queued',
+        $event = OutboxEvent::query()->create([
+            'dedup_key' => 'invoice-email:'.$emailLog->delivery_key,
+            'type' => 'invoice-email', 'aggregate_id' => $emailLog->id,
+            'payload' => ['email_log_id' => $emailLog->id], 'status' => 'pending',
+            'available_at' => now(),
         ]);
+        $emailLog->forceFill(['status' => 'queued'])->save();
 
         try {
-            (new SendInvoiceEmailJob($emailLog->id, $user->id))->handle(
-                app(\App\Services\InvoicePdfService::class),
-                app(\App\Services\InvoiceEmailDeliveryService::class),
-            );
+            (new SendInvoiceEmailJob($emailLog->id, $user->id, null, null, $event->id))
+                ->handle(app(\App\Services\InvoiceEmailDeliveryService::class));
         } catch (\RuntimeException) {
             //
         }
@@ -386,28 +366,20 @@ class InvoiceEmailManagementTest extends TestCase
         Queue::fake();
         config(['queue.default' => 'database']);
 
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['invoice_emails.view', 'invoice_emails.manage', 'invoices.view']);
         [$invoice, $contact] = $this->createInvoiceContext();
-        InvoiceRecipient::query()->create([
-            'invoice_id' => $invoice->id,
-            'contact_person_id' => $contact->id,
-            'email' => 'billing@example.com',
-            'recipient_type' => 'to',
-        ]);
-        $emailLog = EmailLog::query()->create([
-            'invoice_id' => $invoice->id,
-            'subject' => 'FIEA Invoice',
-            'body' => 'Hello, please find the invoice attached.',
-            'status' => 'pending',
+        $emailLog = $this->preparedLog($invoice, [
+            ['email' => 'billing@example.com', 'recipient_type' => 'to'],
         ]);
 
         $this->actingAs($user)
             ->post(route('invoice-emails.send', $emailLog->id))
             ->assertSessionHasNoErrors()
-            ->assertSessionHas('success', 'Correo encolado correctamente. Se enviara en segundo plano.')
+            ->assertSessionHas('success')
             ->assertRedirect();
 
-        Queue::assertPushed(SendInvoiceEmailJob::class);
+        Queue::assertNotPushed(SendInvoiceEmailJob::class);
+        $this->assertDatabaseHas('outbox_events', ['dedup_key' => 'invoice-email:'.$emailLog->delivery_key]);
         $this->assertSame('queued', $emailLog->refresh()->status);
     }
 
@@ -458,6 +430,19 @@ class InvoiceEmailManagementTest extends TestCase
             'status' => 'draft',
             'draft_pdf_file_id' => null,
         ]);
+        $case = BillingCase::query()->create([
+            'trip_phase_id' => $tripPhase->id, 'invoice_type' => 'IC',
+            'billing_mode' => 'standard', 'metadata' => ['document_date' => '2026-07-01'],
+        ]);
+        Storage::fake('local');
+        $objectKey = 'invoices/'.$tripPhase->id.'/approved.pdf';
+        Storage::disk('local')->put($objectKey, '%PDF-1.4 documento aprobado');
+        $file = StorageFile::query()->create([
+            'provider' => 'local', 'bucket' => null, 'object_key' => $objectKey,
+            'original_name' => 'approved.pdf', 'mime_type' => 'application/pdf',
+            'size_bytes' => strlen('%PDF-1.4 documento aprobado'),
+            'checksum' => hash('sha256', '%PDF-1.4 documento aprobado'), 'public_url' => null,
+        ]);
         $contact = ContactPerson::query()->create([
             'full_name' => 'Billing Contact',
             'email' => 'billing@example.com',
@@ -466,6 +451,7 @@ class InvoiceEmailManagementTest extends TestCase
         ]);
         $invoice = Invoice::query()->create([
             'trip_phase_id' => $tripPhase->id,
+            'pdf_file_id' => $file->id,
             'contact_person_id' => $contact->id,
             'created_by_id' => null,
             'code' => 'EMAIL-'.$suffix,
@@ -477,7 +463,30 @@ class InvoiceEmailManagementTest extends TestCase
             'grand_total' => 150,
             'balance_conciliation' => 150,
         ]);
+        $invoice->forceFill(['billing_case_id' => $case->id, 'snapshot' => [
+            'type' => 'IC', 'stage' => 'initial', 'totals' => ['total' => '150.00'],
+        ]])->save();
 
         return [$invoice, $contact];
+    }
+
+    /** @param list<array{email: string, recipient_type: string}> $recipients */
+    private function preparedLog(Invoice $invoice, array $recipients): EmailLog
+    {
+        $file = $invoice->pdfFile;
+        $log = EmailLog::query()->create([
+            'invoice_id' => $invoice->id, 'subject' => 'FIEA Invoice',
+            'body' => 'Hello, please find the invoice attached.', 'status' => 'pending',
+        ]);
+        $log->forceFill([
+            'delivery_key' => (string) str()->uuid(), 'recipients_snapshot' => $recipients,
+            'attachment_snapshot' => [
+                'storage_file_id' => $file->id, 'checksum' => $file->checksum,
+                'filename' => $file->original_name, 'mime_type' => $file->mime_type,
+            ],
+            'payload_hash' => hash('sha256', json_encode($recipients, JSON_THROW_ON_ERROR)),
+            'dispatch_deadline' => now()->addHour(),
+        ])->save();
+        return $log->fresh();
     }
 }

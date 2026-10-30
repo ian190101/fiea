@@ -9,11 +9,13 @@ use App\Models\ContactPerson;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class ContactManagementTest extends TestCase
 {
     use RefreshDatabase;
+    use ExplicitAccess;
 
     public function test_guests_are_redirected_from_contacts(): void
     {
@@ -23,7 +25,7 @@ class ContactManagementTest extends TestCase
 
     public function test_authenticated_users_can_view_contacts(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
 
         $this->actingAs($user)
             ->get('/contactos')
@@ -32,7 +34,7 @@ class ContactManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_contacts(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
 
         $this->actingAs($user)
             ->post(route('contacts.store'), [
@@ -52,7 +54,7 @@ class ContactManagementTest extends TestCase
 
     public function test_contact_emails_must_be_unique_when_present(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
         ContactPerson::query()->create([
             'full_name' => 'Jane Doe',
             'email' => 'jane@example.com',
@@ -72,7 +74,7 @@ class ContactManagementTest extends TestCase
 
     public function test_authenticated_users_can_create_contact_assignments_for_teams(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
         $contact = $this->createContact();
         [$chapter, $team] = $this->createChapterAndTeam();
 
@@ -101,7 +103,7 @@ class ContactManagementTest extends TestCase
 
     public function test_assignment_derives_chapter_when_only_team_is_selected(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
         $contact = $this->createContact();
         [$chapter, $team] = $this->createChapterAndTeam();
 
@@ -127,7 +129,7 @@ class ContactManagementTest extends TestCase
 
     public function test_assignment_rejects_team_from_a_different_chapter(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
         $contact = $this->createContact();
         [$firstChapter] = $this->createChapterAndTeam('First Chapter', 'First Team');
         [, $secondTeam] = $this->createChapterAndTeam('Second Chapter', 'Second Team');
@@ -147,7 +149,7 @@ class ContactManagementTest extends TestCase
 
     public function test_authenticated_users_can_update_assignment_email_recipient_flag(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
         $contact = $this->createContact();
         [$chapter, $team] = $this->createChapterAndTeam();
         $assignment = ContactAssignment::query()->create([
@@ -181,7 +183,7 @@ class ContactManagementTest extends TestCase
 
     public function test_authenticated_users_can_delete_assignments(): void
     {
-        $user = User::factory()->create();
+        $user = $this->authorizedUser(['contacts.view', 'contacts.manage']);
         $contact = $this->createContact();
         [$chapter, $team] = $this->createChapterAndTeam();
         $assignment = ContactAssignment::query()->create([
