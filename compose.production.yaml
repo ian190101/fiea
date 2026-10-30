@@ -1,0 +1,78 @@
+name: fiea
+
+x-application: &application
+  image: ${FIEA_IMAGE:-fiea:local}
+  env_file:
+    - ${FIEA_SHARED_DIR:-../fiea-shared}/app.env
+  volumes:
+    - ${FIEA_SHARED_DIR:-../fiea-shared}/storage:/var/www/html/storage
+  networks:
+    - application
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+
+services:
+  db:
+    image: mysql:8.4
+    env_file:
+      - ${FIEA_SHARED_DIR:-../fiea-shared}/database.env
+    volumes:
+      - database:/var/lib/mysql
+    networks:
+      - application
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, mysqladmin, ping, -h, 127.0.0.1, --silent]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  app:
+    <<: *application
+    ports:
+      - 127.0.0.1:${FIEA_HTTP_PORT:-18082}:8080
+      - ${FIEA_TUNNEL_BIND_IP:-172.17.0.1}:${FIEA_HTTP_PORT:-18082}:8080
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, php, docker/healthcheck.php]
+      interval: 20s
+      timeout: 8s
+      retries: 6
+      start_period: 60s
+
+  worker:
+    <<: *application
+    user: www-data
+    command: [php, artisan, 'queue:work', database, '--queue=emails,default', '--sleep=3', '--tries=1', '--timeout=90']
+    depends_on:
+      app:
+        condition: service_healthy
+
+  scheduler:
+    <<: *application
+    user: www-data
+    command: [php, artisan, 'schedule:work', --no-interaction]
+    depends_on:
+      app:
+        condition: service_healthy
+
+networks:
+  application:
+    ipam:
+      config:
+        - subnet: ${FIEA_DOCKER_SUBNET:-172.19.0.0/24}
+
+volumes:
+  database:
