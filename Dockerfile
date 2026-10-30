@@ -24,6 +24,9 @@ COPY routes ./routes
 COPY public ./public
 COPY artisan ./artisan
 
+ARG VITE_APP_NAME=FIEA
+ENV VITE_APP_NAME=${VITE_APP_NAME}
+
 RUN composer dump-autoload --optimize \
     && npm run build
 
