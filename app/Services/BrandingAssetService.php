@@ -12,7 +12,7 @@ class BrandingAssetService
 {
     private const SETTINGS_CACHE_KEY = 'fiea:branding:settings';
 
-    private const LOGO_DATA_CACHE_PREFIX = 'fiea:branding:logo-data:';
+    private const LOGO_DATA_CACHE_PREFIX = 'fiea:branding:logo-data-base64:';
 
     /**
      * @return array{primary: string, secondary: string, accent: string}
@@ -61,11 +61,12 @@ class BrandingAssetService
         }
 
         $contents = $this->remember("{$file->id}:{$file->checksum}:{$file->updated_at?->timestamp}", 3600, function () use ($disk, $file) {
-            return Storage::disk($disk)->get($file->object_key);
+            // MySQL almacena la caché como texto UTF-8; el PNG debe conservarse como base64.
+            return base64_encode(Storage::disk($disk)->get($file->object_key));
         });
         $mimeType = $file->mime_type ?: 'image/png';
 
-        return 'data:'.$mimeType.';base64,'.base64_encode($contents);
+        return 'data:'.$mimeType.';base64,'.$contents;
     }
 
     public function flushCache(): void
