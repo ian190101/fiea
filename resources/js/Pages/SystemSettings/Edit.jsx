@@ -4,21 +4,36 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import FinancialActionSheet from '@/Components/FinancialActionSheet';
 import { useUnsavedChangesGuard } from '@/Utils/useUnsavedChangesGuard';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
-export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }) {
+export default function SystemSettingsEdit({ settings = {}, storageStatus = {}, logoUrl = null, mailSettings = {} }) {
     const { flash } = usePage().props;
 
     const form = useForm({
-        primary_color: settings.primary_color ?? '#2563eb',
-        secondary_color: settings.secondary_color ?? '#0f766e',
-        accent_color: settings.accent_color ?? '#f59e0b',
+        primary_color: settings.primary_color ?? '#3960a3',
+        secondary_color: settings.secondary_color ?? '#f78e3c',
+        accent_color: settings.accent_color ?? '#007145',
         logo: null,
     });
-    const guard = useUnsavedChangesGuard(form.isDirty && !form.processing);
-    // El acento es decorativo; el texto blanco se muestra sobre primario y secundario.
-    const contrastProblems = ['primary_color', 'secondary_color']
+    const mailForm = useForm({ account: mailSettings.account ?? '', from_name: mailSettings.from_name ?? 'FIEA',
+        app_password: '', enabled: mailSettings.enabled ?? true, version: mailSettings.version ?? 0 });
+    useEffect(() => {
+        const current = { account: mailSettings.account ?? '', from_name: mailSettings.from_name ?? 'FIEA',
+            app_password: '', enabled: mailSettings.enabled ?? true, version: mailSettings.version ?? 0 };
+        mailForm.setData(current);
+        mailForm.setDefaults(current);
+    }, [mailSettings.version]);
+    const [uploadedLogoUrl, setUploadedLogoUrl] = useState(null);
+    useEffect(() => {
+        if (!form.data.logo) { setUploadedLogoUrl(null); return undefined; }
+        const url = URL.createObjectURL(form.data.logo);
+        setUploadedLogoUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [form.data.logo]);
+    const guard = useUnsavedChangesGuard((form.isDirty || mailForm.isDirty) && !form.processing && !mailForm.processing);
+    // El naranja es institucional y decorativo; los botones con texto blanco utilizan el primario.
+    const contrastProblems = ['primary_color']
         .filter((field) => contrastAgainstWhite(form.data[field]) < 4.5);
 
     const previewStyle = useMemo(() => ({
@@ -81,7 +96,7 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
                             />
                             <ColorField
                                 id="accent_color"
-                                label="Color acento"
+                                    label="Color terciario"
                                 value={form.data.accent_color}
                                 error={form.errors.accent_color}
                                 onChange={(value) => form.setData('accent_color', value)}
@@ -120,16 +135,16 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
                             <h2 className="text-xl font-black">Vista previa</h2>
                             <div className="mt-5 rounded-[2rem] border border-white/40 bg-white/35 p-5 shadow-lg dark:border-white/10 dark:bg-white/10">
                                 <div className="flex items-center gap-4">
-                                    <LogoPreview settings={settings} />
+                                    <LogoPreview settings={{ ...settings, logo: { ...settings.logo, public_url: uploadedLogoUrl ?? logoUrl } }} />
                                     <div>
                                         <p className="text-lg font-black">FIEA</p>
                                         <p className="text-sm font-bold text-app-muted">Invoices & Budget</p>
                                     </div>
                                 </div>
                                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                                    <PreviewChip label="Primary" color="var(--preview-primary)" />
-                                    <PreviewChip label="Secondary" color="var(--preview-secondary)" />
-                                    <PreviewChip label="Accent" color="var(--preview-accent)" />
+                                    <PreviewChip label="Primario" color="var(--preview-primary)" />
+                                    <PreviewChip label="Secundario" color="var(--preview-secondary)" />
+                                    <PreviewChip label="Terciario" color="var(--preview-accent)" />
                                 </div>
                                 <div
                                     className="mt-5 rounded-2xl px-4 py-3 text-sm font-black text-white"
@@ -150,12 +165,50 @@ export default function SystemSettingsEdit({ settings = {}, storageStatus = {} }
                             </div>
                         </div>
 
+                        <MailSettingsPanel form={mailForm} passwordConfigured={mailSettings.password_configured} />
                         <StorageStatusCard storageStatus={storageStatus} />
                     </div>
                 </section>
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function MailSettingsPanel({ form, passwordConfigured }) {
+    const [sendingTest, setSendingTest] = useState(false);
+    const submit = event => {
+        event.preventDefault();
+        form.post(route('mail-settings.update'), { preserveScroll: true, onFinish: () => form.reset('app_password') });
+    };
+    return <section className="glass-panel rounded-[2rem] p-5" aria-labelledby="gmail-settings-title">
+        <h2 id="gmail-settings-title" className="text-xl font-black">Correo de Gmail</h2>
+        <p className="mt-2 text-sm text-app-muted">Configura la cuenta emisora sin editar código. Los destinatarios de las facturas se eligen desde Contactos.</p>
+        <form onSubmit={submit} className="mt-5 space-y-4">
+            <div><InputLabel htmlFor="mail_account" value="Cuenta de Gmail o Google Workspace" />
+                <input id="mail_account" type="email" required autoComplete="email" className="ios-field mt-1 w-full"
+                    value={form.data.account} onChange={event => form.setData('account', event.target.value)} />
+                <InputError message={form.errors.account} /></div>
+            <div><InputLabel htmlFor="mail_from_name" value="Nombre del remitente" />
+                <input id="mail_from_name" required maxLength={100} className="ios-field mt-1 w-full"
+                    value={form.data.from_name} onChange={event => form.setData('from_name', event.target.value)} />
+                <InputError message={form.errors.from_name} /></div>
+            <div><InputLabel htmlFor="mail_app_password" value="Contraseña de aplicación" />
+                <input id="mail_app_password" type="password" autoComplete="new-password" maxLength={24}
+                    className="ios-field mt-1 w-full" value={form.data.app_password}
+                    aria-describedby="mail-password-help" onChange={event => form.setData('app_password', event.target.value)} />
+                <p id="mail-password-help" className="mt-2 text-xs text-app-muted">{passwordConfigured ? 'Ya hay una contraseña guardada. Deja el campo vacío para conservarla.' : 'Introduce la contraseña de aplicación generada en Google.'} Se guarda cifrada y nunca se muestra de nuevo.</p>
+                <InputError message={form.errors.app_password} /></div>
+            <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={form.data.enabled}
+                onChange={event => form.setData('enabled', event.target.checked)} /> Envío de facturas habilitado</label>
+            <InputError message={form.errors.version} />
+            <PrimaryButton type="submit" disabled={form.processing}>Guardar y comprobar conexión</PrimaryButton>
+        </form>
+        <button type="button" className="glass-button mt-4 px-4 py-2" disabled={sendingTest || form.isDirty || !passwordConfigured}
+            onClick={() => router.post(route('mail-settings.test'), {}, { preserveScroll: true,
+                onStart: () => setSendingTest(true), onFinish: () => setSendingTest(false) })}>
+            {sendingTest ? 'Enviando prueba…' : 'Enviar correo de prueba'}</button>
+        <p className="mt-2 text-xs text-app-muted">La prueba se envía únicamente a la cuenta guardada y lleva el aviso PRUEBA.</p>
+    </section>;
 }
 
 function StorageStatusCard({ storageStatus }) {

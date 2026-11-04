@@ -1,11 +1,16 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Actions\Email;
 
 use App\Models\AuditLog;
+use App\Models\BillingCase;
 use App\Models\EmailLog;
 use App\Models\Invoice;
+use App\Models\TripPhase;
 use App\Models\User;
+use App\Services\InvoiceEmailDispatchPolicy;
 use App\Services\InvoicePdfService;
 use App\Services\Security\ScopeService;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +24,11 @@ final class PrepareInvoiceEmail
     public function execute(User $actor, Invoice $invoice, array $data): EmailLog
     {
         $this->scope->authorize($actor, 'invoice_emails.manage', (int) $invoice->trip_phase_id);
-        $window=(int)config('services.resend.idempotency_window_seconds',0);
-        abort_unless($window>60,503,'Configura la ventana de idempotencia del proveedor.');
+        $window = app(InvoiceEmailDispatchPolicy::class)->windowSeconds();
+        abort_unless($window > 60, 503, 'Configura el plazo de despacho del proveedor de correo.');
         $version = (int) $invoice->version;
         $snapshotHash = hash('sha256', json_encode($invoice->snapshot, JSON_THROW_ON_ERROR));
-        $file = $invoice->pdfFile ?: $this->pdfs->generate($invoice, $actor);
+        $file = $this->pdfs->forPreparation($invoice, $actor);
         $recipients = collect($data['recipients'])->map(fn (array $row) => [
             'contact_person_id' => $row['contact_person_id'] ?? null,
             'email' => strtolower(trim($row['email'])),
@@ -40,9 +45,9 @@ final class PrepareInvoiceEmail
         return DB::transaction(function () use ($actor, $invoice, $version, $snapshotHash,
             $data, $recipients, $attachment, $payloadHash, $window): EmailLog {
             User::query()->lockForUpdate()->findOrFail($actor->id);
-            \App\Models\TripPhase::query()->lockForUpdate()->findOrFail($invoice->trip_phase_id);
+            TripPhase::query()->lockForUpdate()->findOrFail($invoice->trip_phase_id);
             abort_unless($invoice->billing_case_id !== null, 409);
-            \App\Models\BillingCase::query()->lockForUpdate()->findOrFail($invoice->billing_case_id);
+            BillingCase::query()->lockForUpdate()->findOrFail($invoice->billing_case_id);
             $locked = Invoice::query()->lockForUpdate()->findOrFail($invoice->id);
             $this->scope->authorize($actor, 'invoice_emails.manage', (int) $locked->trip_phase_id);
             abort_unless((int) $locked->version === $version
@@ -66,6 +71,7 @@ final class PrepareInvoiceEmail
                 'trip_phase_id' => $locked->trip_phase_id,
                 'metadata' => ['invoice_id' => $locked->id, 'payload_hash' => $payloadHash],
             ]);
+
             return $log;
         }, 3);
     }

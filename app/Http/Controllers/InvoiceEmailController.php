@@ -41,13 +41,12 @@ class InvoiceEmailController extends Controller
                 ->get(), 'invoice-emails'),
             'templateTokens' => $templates->availableTokens(),
             'contacts' => Inertia::defer(fn () => ContactPerson::query()
-                ->whereHas('assignments', fn ($q) => $q
-                    ->whereIn('team_id', $scope->tripPhases($actor)->select('trip_phases.team_id'))
-                    ->orWhere(fn ($c) => $c->whereNull('team_id')->whereIn('chapter_id', DB::table('teams')->select('chapter_id')
-                        ->whereIn('id', $scope->tripPhases($actor)->select('trip_phases.team_id')))))
-                ->whereNotNull('email')
-                ->orderBy('full_name')
-                ->limit(25)->get(['id', 'full_name', 'email']), 'invoice-emails'),
+                ->whereHas('assignments', fn ($q) => $q->where('is_active', true)
+                    ->where(fn ($assignment) => $assignment
+                        ->whereIn('team_id', $scope->tripPhases($actor)->select('trip_phases.team_id'))
+                        ->orWhere(fn ($chapter) => $chapter->whereNull('team_id')->whereIn('chapter_id', DB::table('teams')->select('chapter_id')
+                            ->whereIn('id', $scope->tripPhases($actor)->select('trip_phases.team_id'))))))
+                ->whereNotNull('email')->orderBy('full_name')->limit(25)->get(['id', 'full_name', 'email']), 'invoice-emails'),
             'recommendedRecipients' => Inertia::defer(fn () => $this->recommendedRecipients(
                 $this->invoices($actor, $scope)->getCollection()), 'invoice-emails'),
             'emailLogs' => Inertia::defer(fn () => EmailLog::query()

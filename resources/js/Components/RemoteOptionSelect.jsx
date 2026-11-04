@@ -2,7 +2,7 @@ import { Children, useEffect, useRef, useState } from 'react';
 
 const labels={countries:'países',communities:'comunidades',projects:'proyectos',teams:'equipos',chapters:'capítulos',
     'chapter-types':'tipos de capítulo',universities:'universidades',technicians:'técnicos','trip-phases':'viajes',
-    'estimated-expenses':'gastos estimados','actual-expenses':'gastos reales','budget-lines':'líneas Final','audit-users':'usuarios con eventos'};
+    'estimated-expenses':'gastos estimados','actual-expenses':'gastos reales','budget-lines':'líneas Final','audit-users':'usuarios con eventos','invoice-contacts':'contactos por nombre o correo'};
 
 export default function RemoteOptionSelect({ kind, children, value, onChange, id, name, disabled, required, className, remoteParams = {}, ...props }) {
     const [query,setQuery]=useState('');

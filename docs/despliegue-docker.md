@@ -39,4 +39,4 @@ En las actualizaciones se conservan los archivos privados y volúmenes, se respa
 
 La ruta pública de Cloudflare debe apuntar al HTTP privado de FIEA y conservar el hostname solicitado. `APP_URL`, `TRUSTED_HOST_PATTERNS`, proxies confiables y cookies seguras deben corresponder al dominio. No se modifica el conector ni las rutas de otras aplicaciones.
 
-Configura las credenciales de Resend y su ventana de idempotencia confirmada antes de habilitar entregas automáticas. El almacenamiento local es persistente en este despliegue; Cloudflare R2 requiere configuración explícita y no sustituye silenciosamente un disco mal configurado.
+Configura el proveedor de correo antes de habilitar entregas automáticas. Gmail SMTP se documenta en [correo-gmail.md](correo-gmail.md); Resend requiere su credencial y una ventana de idempotencia confirmada. SMTP bloquea la repetición automática de intentos inciertos porque el proveedor no ofrece esa deduplicación. El almacenamiento local es persistente en este despliegue; Cloudflare R2 requiere configuración explícita y no sustituye silenciosamente un disco mal configurado.

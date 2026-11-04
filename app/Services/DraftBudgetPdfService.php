@@ -51,7 +51,7 @@ final class DraftBudgetPdfService
                 for ($day = $start; $day->lte($end); $day = $day->addDay()) {
                     $days[] = $day->toDateString();
                 }
-                foreach (array_chunk($days, 7) as $block) {
+                foreach (array_chunk($days, 14) as $block) {
                     $sheets[] = [
                         'type' => $case->invoice_type, 'stage' => $stage, 'snapshot' => $snapshot, 'days' => $block,
                     ];
@@ -64,9 +64,9 @@ final class DraftBudgetPdfService
             'brand' => $this->brandingAssets->colors(),
             'logoDataUri' => $this->brandingAssets->logoDataUri(),
         ])->setOptions(['isRemoteEnabled' => false, 'isPhpEnabled' => false,
-            'chroot' => public_path('build')])->setPaper('letter', 'landscape');
+            'chroot' => public_path('build')])->setPaper('a4', 'landscape');
         $contents = $pdf->output();
-        $digest = hash('sha256', json_encode($sheets, JSON_THROW_ON_ERROR));
+        $digest = hash('sha256', json_encode([$sheets, $this->brandingAssets->documentStyleKey()], JSON_THROW_ON_ERROR));
         $fileName = 'draft-budget-'.$tripPhase->id.'-'.substr($digest, 0, 16).'.pdf';
         $key = 'draft-budgets/'.$tripPhase->id.'/'.$fileName;
         $disk = $this->files->activeDisk();

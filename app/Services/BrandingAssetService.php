@@ -22,9 +22,9 @@ class BrandingAssetService
         $settings = $this->settings();
 
         return [
-            'primary' => $settings?->primary_color ?? '#2563eb',
-            'secondary' => $settings?->secondary_color ?? '#0f766e',
-            'accent' => $settings?->accent_color ?? '#f59e0b',
+            'primary' => $settings?->primary_color ?? '#3960a3',
+            'secondary' => $settings?->secondary_color ?? '#f78e3c',
+            'accent' => $settings?->accent_color ?? '#007145',
         ];
     }
 
@@ -38,7 +38,7 @@ class BrandingAssetService
         $file = $this->logoFile();
 
         if (! $file instanceof StorageFile) {
-            return null;
+            return asset('images/fiea-logo.png');
         }
 
         return route('branding.logo', ['v' => $file->checksum ?: $file->id]);
@@ -49,7 +49,9 @@ class BrandingAssetService
         $file = $this->logoFile();
 
         if (! $file instanceof StorageFile) {
-            return null;
+            $path = public_path('images/fiea-logo.png');
+
+            return is_file($path) ? 'data:image/png;base64,'.base64_encode(file_get_contents($path)) : null;
         }
 
         $disk = $file->diskName();
@@ -69,6 +71,12 @@ class BrandingAssetService
     public function flushCache(): void
     {
         Cache::forget(self::SETTINGS_CACHE_KEY);
+    }
+
+    public function documentStyleKey(): string
+    {
+        return hash('sha256', json_encode([FinancialPrintLayout::VERSION, $this->colors(),
+            hash('sha256', $this->logoDataUri() ?? '')], JSON_THROW_ON_ERROR));
     }
 
     private function settings(): ?SystemSetting
@@ -107,9 +115,9 @@ class BrandingAssetService
     private function defaultColors(): array
     {
         return [
-            'primary' => '#2563eb',
-            'secondary' => '#0f766e',
-            'accent' => '#f59e0b',
+            'primary' => '#3960a3',
+            'secondary' => '#f78e3c',
+            'accent' => '#007145',
         ];
     }
 }

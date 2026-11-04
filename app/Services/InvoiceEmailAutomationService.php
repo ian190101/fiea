@@ -25,12 +25,17 @@ class InvoiceEmailAutomationService
      */
     public function run(bool $prepare = true, bool $sendPending = true, bool $retryFailed = true): array
     {
+        app(MailConfiguration::class)->apply();
         $summary = [
             'prepared' => 0,
             'sent' => 0,
             'retried' => 0,
             'failed' => 0,
         ];
+
+        if (! config('mail.invoice_queue_enabled')) {
+            return $summary;
+        }
 
         if ($prepare) {
             $summary['prepared'] = $this->prepareApprovedInvoices();
@@ -52,7 +57,7 @@ class InvoiceEmailAutomationService
 
     public function prepareApprovedInvoices(): int
     {
-        $window = (int) config('services.resend.idempotency_window_seconds', 0);
+        $window = app(InvoiceEmailDispatchPolicy::class)->windowSeconds();
         if ($window <= 60) {
             return 0;
         }
@@ -72,7 +77,7 @@ class InvoiceEmailAutomationService
                     if (OutboxEvent::query()->where('dedup_key', $dedup)->exists()) {
                         continue;
                     }
-                    $file = $invoice->pdfFile ?: $this->pdfs->generate($invoice);
+                    $file = $this->pdfs->forPreparation($invoice);
                     $message = $this->templates->renderFor($invoice);
                     $recipients = $invoice->recipients->map(fn ($row) => [
                         'email' => $row->email, 'recipient_type' => $row->recipient_type,

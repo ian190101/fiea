@@ -16,6 +16,8 @@ class InvoiceEmailQueueService
 {
     public function enqueue(EmailLog $emailLog, ?User $user = null, ?string $ip = null, ?string $userAgent = null): void
     {
+        app(MailConfiguration::class)->apply();
+        abort_unless((bool) config('mail.invoice_queue_enabled'), 503, 'El envío de correos está deshabilitado.');
         DB::transaction(function () use ($emailLog, $user, $ip, $userAgent): void {
             if ($user) {
                 $user = User::query()->lockForUpdate()->findOrFail($user->id);

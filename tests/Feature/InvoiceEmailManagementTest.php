@@ -2,35 +2,41 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendInvoiceEmailJob;
 use App\Models\AuditLog;
 use App\Models\BillingCase;
 use App\Models\Chapter;
 use App\Models\ChapterType;
+use App\Models\ContactAssignment;
 use App\Models\ContactPerson;
 use App\Models\Country;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Invoice;
-use App\Models\InvoiceRecipient;
 use App\Models\OutboxEvent;
 use App\Models\Project;
 use App\Models\StorageFile;
 use App\Models\Team;
 use App\Models\TripPhase;
-use App\Models\User;
-use App\Jobs\SendInvoiceEmailJob;
+use App\Services\InvoiceEmailDeliveryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 use Tests\Concerns\ExplicitAccess;
 use Tests\TestCase;
 
 class InvoiceEmailManagementTest extends TestCase
 {
-    use RefreshDatabase;
     use ExplicitAccess;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -287,7 +293,7 @@ class InvoiceEmailManagementTest extends TestCase
         $emailLog->forceFill(['status' => 'queued'])->save();
 
         (new SendInvoiceEmailJob($emailLog->id, $user->id, null, null, $event->id))
-            ->handle(app(\App\Services\InvoiceEmailDeliveryService::class));
+            ->handle(app(InvoiceEmailDeliveryService::class));
 
         Http::assertSent(fn ($request) => $request->url() === 'https://api.resend.com/emails'
             && $request['to'] === ['billing@example.com']
@@ -346,7 +352,7 @@ class InvoiceEmailManagementTest extends TestCase
 
         try {
             (new SendInvoiceEmailJob($emailLog->id, $user->id, null, null, $event->id))
-                ->handle(app(\App\Services\InvoiceEmailDeliveryService::class));
+                ->handle(app(InvoiceEmailDeliveryService::class));
         } catch (\RuntimeException) {
             //
         }
@@ -383,9 +389,109 @@ class InvoiceEmailManagementTest extends TestCase
         $this->assertSame('queued', $emailLog->refresh()->status);
     }
 
-    /**
-     * @return array{0: Invoice, 1: ContactPerson}
-     */
+    public function test_smtp_envia_pdf_congelado_y_copias_con_identificador_estable(): void
+    {
+        [$invoice] = $this->createInvoiceContext();
+        $log = $this->preparedLog($invoice, [['email' => 'destino@example.test', 'recipient_type' => 'to'],
+            ['email' => 'copia@example.test', 'recipient_type' => 'cc'],
+            ['email' => 'oculto@example.test', 'recipient_type' => 'bcc']]);
+        $transport = new ArrayTransport;
+        $this->configureSmtp($transport);
+        app(InvoiceEmailDeliveryService::class)->send($log);
+        $log->refresh();
+        self::assertSame('sent', $log->status);
+        self::assertSame('sent', $invoice->refresh()->status);
+        self::assertSame('invoice-email-'.$log->delivery_key.'@example.test', $log->provider_message_id);
+        $message = $transport->messages()[0]->getOriginalMessage();
+        self::assertSame('destino@example.test', $message->getTo()[0]->getAddress());
+        self::assertSame('copia@example.test', $message->getCc()[0]->getAddress());
+        self::assertSame('oculto@example.test', $message->getBcc()[0]->getAddress());
+        self::assertCount(1, $message->getAttachments());
+        self::assertSame('%PDF-1.4 documento aprobado', $message->getAttachments()[0]->getBody());
+    }
+
+    public function test_smtp_ambiguo_queda_bloqueado_antes_del_transporte_y_no_se_reenvia(): void
+    {
+        [$invoice] = $this->createInvoiceContext();
+        $log = $this->preparedLog($invoice, [['email' => 'destino@example.test', 'recipient_type' => 'to']]);
+        $transport = new class($log->id) extends AbstractTransport
+        {
+            public int $intentos = 0;
+
+            public ?string $estadoAntesDeEnviar = null;
+
+            public function __construct(private readonly int $logId)
+            {
+                parent::__construct();
+            }
+
+            protected function doSend(SentMessage $message): void
+            {
+                $this->intentos++;
+                $this->estadoAntesDeEnviar = EmailLog::query()->findOrFail($this->logId)->status;
+                throw new TransportException('Interrupción SMTP simulada.');
+            }
+
+            public function __toString(): string
+            {
+                return 'smtp-prueba';
+            }
+        };
+        $this->configureSmtp($transport);
+        $delivery = app(InvoiceEmailDeliveryService::class);
+        $delivery->send($log);
+        $delivery->send($log->fresh());
+        self::assertSame('unknown', $transport->estadoAntesDeEnviar);
+        self::assertSame('unknown', $log->refresh()->status);
+        self::assertSame(1, $transport->intentos);
+        self::assertNull($log->next_retry_at);
+    }
+
+    public function test_selector_de_contactos_busca_pagina_y_excluye_otro_equipo(): void
+    {
+        $actor = $this->authorizedUser(['invoice_emails.manage']);
+        [$invoice, $primary] = $this->createInvoiceContext();
+        for ($i = 1; $i <= 30; $i++) {
+            $contact = ContactPerson::query()->create(['full_name' => sprintf('Contacto %02d', $i), 'email' => "contacto{$i}@example.test"]);
+            ContactAssignment::query()->create(['contact_person_id' => $contact->id, 'chapter_id' => $invoice->tripPhase->team->chapter_id,
+                'team_id' => $invoice->tripPhase->team_id, 'role' => 'Other', 'is_active' => true]);
+        }
+        $hidden = ContactPerson::query()->create(['full_name' => 'Contacto ajeno', 'email' => 'ajeno@example.test']);
+        $url = route('options.lookup', ['kind' => 'invoice-contacts', 'invoice_id' => $invoice->id]);
+        $first = $this->actingAs($actor)->getJson($url)->assertOk()->json();
+        self::assertCount(25, $first['data']);
+        $second = $this->getJson($first['next_page_url'])->assertOk()->json();
+        self::assertCount(31, array_unique(array_merge(array_column($first['data'], 'id'), array_column($second['data'], 'id'))));
+        self::assertSame('contacto30@example.test', $this->getJson($url.'&q=contacto30%40example.test')->assertOk()->json('data.0.email'));
+        self::assertSame([], $this->getJson($url.'&selected_id='.$hidden->id)->assertOk()->json('data'));
+        $actor->forceFill(['scope_all' => false])->save();
+        $this->getJson($url)->assertNotFound();
+    }
+
+    public function test_preparacion_rechaza_correo_suplantado_y_contacto_ajeno(): void
+    {
+        $actor = $this->authorizedUser(['invoice_emails.manage']);
+        [$invoice, $contact] = $this->createInvoiceContext();
+        $hidden = ContactPerson::query()->create(['full_name' => 'Contacto ajeno', 'email' => 'ajeno@example.test']);
+        foreach ([[$contact->id, 'suplantado@example.test'], [$hidden->id, $hidden->email]] as [$id, $email]) {
+            $this->actingAs($actor)->post(route('invoice-emails.store', $invoice), ['subject' => 'Prueba', 'body' => 'Prueba',
+                'recipients' => [['contact_person_id' => $id, 'email' => $email, 'recipient_type' => 'to']]])
+                ->assertSessionHasErrors('recipients.0.email');
+        }
+        $this->assertDatabaseCount('email_logs', 0);
+    }
+
+    private function configureSmtp(TransportInterface $transport): void
+    {
+        config(['services.transactional_mail.provider' => 'smtp', 'mail.default' => 'smtp',
+            'mail.from.address' => 'emisor@example.test', 'mail.mailers.smtp.host' => 'smtp.example.test',
+            'mail.mailers.smtp.username' => 'usuario', 'mail.mailers.smtp.password' => 'clave-sintetica',
+            'mail.mailers.smtp.require_tls' => true]);
+        Mail::purge('smtp');
+        Mail::mailer('smtp')->setSymfonyTransport($transport);
+    }
+
+    /** @return array{0: Invoice, 1: ContactPerson} */
     private function createInvoiceContext(): array
     {
         $suffix = (string) str()->uuid();
@@ -487,6 +593,7 @@ class InvoiceEmailManagementTest extends TestCase
             'payload_hash' => hash('sha256', json_encode($recipients, JSON_THROW_ON_ERROR)),
             'dispatch_deadline' => now()->addHour(),
         ])->save();
+
         return $log->fresh();
     }
 }

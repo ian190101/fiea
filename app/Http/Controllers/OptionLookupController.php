@@ -9,18 +9,22 @@ use App\Models\BudgetLine;
 use App\Models\Chapter;
 use App\Models\ChapterType;
 use App\Models\Community;
+use App\Models\ContactPerson;
 use App\Models\Country;
 use App\Models\EstimatedExpense;
+use App\Models\Invoice;
 use App\Models\Project;
 use App\Models\Team;
 use App\Models\TripPhase;
 use App\Models\University;
 use App\Models\User;
 use App\Queries\AuditLogQuery;
+use App\Queries\InvoiceEmailContactQuery;
 use App\Services\Security\ScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 final class OptionLookupController extends Controller
 {
@@ -40,16 +44,23 @@ final class OptionLookupController extends Controller
             'actual-expenses' => [ActualExpense::class, 'description', ['receipts']],
             'budget-lines' => [BudgetLine::class, 'description_en', ['receipts']],
             'audit-users' => [User::class, 'name', ['audit_logs']],
+            'invoice-contacts' => [ContactPerson::class, 'full_name', ['invoice_emails']],
         ];
         abort_unless(isset($definitions[$kind]), 404);
         [$class,$label,$modules] = $definitions[$kind];
         $actor = $request->user();
         abort_unless($actor?->is_active && $actor->hasAnyPermission(collect($modules)->flatMap(fn ($m) => [$m.'.view', $m.'.manage'])->all()), 403);
         $data = $request->validate(['q' => ['nullable', 'string', 'max:120'], 'cursor' => ['nullable', 'string', 'max:500'], 'selected_id' => ['nullable', 'integer', 'min:1'],
-            'country_id' => ['nullable', 'integer', 'min:1'], 'trip_phase_id' => ['nullable', 'integer', 'min:1'], 'chapter_id' => ['nullable', 'integer', 'min:1']]);
+            'country_id' => ['nullable', 'integer', 'min:1'], 'trip_phase_id' => ['nullable', 'integer', 'min:1'], 'chapter_id' => ['nullable', 'integer', 'min:1'],
+            'invoice_id' => [Rule::requiredIf($kind === 'invoice-contacts'), 'integer', 'min:1']]);
         $query = $class::query();
         $phases = $scope->tripPhases($actor);
         $chapters = DB::table('user_chapter_assignments')->select('chapter_id')->where('user_id', $actor->id);
+        if ($kind === 'invoice-contacts') {
+            $invoice = Invoice::query()->findOrFail($data['invoice_id']);
+            $scope->authorize($actor, 'invoice_emails.manage', (int) $invoice->trip_phase_id);
+            $query = app(InvoiceEmailContactQuery::class)->forInvoice($invoice);
+        }
         if ($kind === 'projects' && ! $actor->scope_all) {
             $query->where(fn ($q) => $q
                 ->whereIn('id', DB::table('user_project_assignments')->select('project_id')->where('user_id', $actor->id))
@@ -97,6 +108,9 @@ final class OptionLookupController extends Controller
                 if ($kind === 'projects') {
                     $q->orWhere('code', 'like', '%'.$data['q'].'%');
                 }
+                if ($kind === 'invoice-contacts') {
+                    $q->orWhere('email', 'like', '%'.$data['q'].'%');
+                }
             });
         }
         if (isset($data['selected_id'])) {
@@ -113,6 +127,7 @@ final class OptionLookupController extends Controller
             'actual-expenses' => ['id', 'trip_phase_id', 'description', 'real_total', 'receipt_number'],
             'estimated-expenses' => ['id', 'trip_phase_id', 'description', 'expense_category_id', 'unit', 'initial_unit_cost', 'initial_quantity', 'fund_type'],
             'budget-lines' => ['id', 'billing_case_id', 'description_en', 'description_es'],
+            'invoice-contacts' => ['id', 'full_name', 'email'],
         };
         if ($kind === 'trip-phases') {
             $query->with(['project:id,code,name', 'team:id,name']);
@@ -127,7 +142,11 @@ final class OptionLookupController extends Controller
         return response()->json($query->orderBy('id')->cursorPaginate(25, $columns, 'cursor', $data['cursor'] ?? null)->withQueryString()
             ->through(function ($row) use ($kind, $label): array {
                 $result = $row->toArray();
-                $result['name'] = $kind === 'trip-phases' ? ($row->project?->code.' · '.$row->phase.' · '.$row->starts_on?->toDateString()) : $row->{$label};
+                $result['name'] = match ($kind) {
+                    'trip-phases' => $row->project?->code.' · '.$row->phase.' · '.$row->starts_on?->toDateString(),
+                    'invoice-contacts' => $row->full_name.' · '.$row->email,
+                    default => $row->{$label},
+                };
 
                 return $result;
             }));

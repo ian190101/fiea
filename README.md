@@ -40,6 +40,8 @@ php artisan fiea:email-automation
 El comando `fiea:production-check` valida base de datos, almacenamiento, cache, colas, scheduler y configuracion critica.
 El comando `fiea:backup-database` genera un archivo SQL y lo guarda en el almacenamiento activo.
 
+La configuración de Gmail, la selección de destinatarios desde Contactos y las pruebas de envío se describen en [docs/correo-gmail.md](docs/correo-gmail.md).
+
 ## Scheduler
 
 En produccion debe ejecutarse cada minuto:

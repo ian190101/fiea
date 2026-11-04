@@ -47,6 +47,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->dontFlash(['app_password']);
         $exceptions->render(function (Throwable $error, Request $request) {
             // Inertia conserva la redirección de validación; los demás fallos usan el mismo contrato JSON.
             $json = $request->expectsJson() || $request->headers->has('X-Inertia');

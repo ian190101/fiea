@@ -18,6 +18,8 @@ return [
 
     'invoice_queue_enabled' => env('FIEA_EMAIL_QUEUE_ENABLED', true),
 
+    'invoice_dispatch_window_seconds' => (int) env('FIEA_EMAIL_DISPATCH_WINDOW_SECONDS', 86400),
+
     /*
     |--------------------------------------------------------------------------
     | Mailer Configurations
@@ -48,6 +50,7 @@ return [
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
             'timeout' => env('MAIL_TIMEOUT', 10),
+            'require_tls' => env('MAIL_REQUIRE_TLS', true),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

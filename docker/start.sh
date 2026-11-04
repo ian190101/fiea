@@ -3,8 +3,15 @@ set -euo pipefail
 
 export PORT="${PORT:-8080}"
 
-sed -i "s/Listen 80/Listen ${PORT}/g" /etc/apache2/ports.conf
-sed -i "s/\${PORT}/${PORT}/g" /etc/apache2/sites-available/000-default.conf
+if ! [[ "$PORT" =~ ^[0-9]{1,5}$ ]] || ((10#$PORT < 1 || 10#$PORT > 65535)); then
+    echo "PORT debe ser un número entre 1 y 65535." >&2
+    exit 1
+fi
+export PORT="$((10#$PORT))"
+
+# Se regenera la escucha para que reiniciar no convierta 8080 en 808080.
+printf 'Listen %s\n' "$PORT" > /etc/apache2/ports.conf
+sed -i -E "s@^<VirtualHost \\*:[^>]+>@<VirtualHost *:${PORT}>@" /etc/apache2/sites-available/000-default.conf
 
 if [ -n "${MYSQL_ATTR_SSL_CA_CONTENT:-}" ]; then
     printf '%s' "${MYSQL_ATTR_SSL_CA_CONTENT}" > /tmp/tidb-ca.pem

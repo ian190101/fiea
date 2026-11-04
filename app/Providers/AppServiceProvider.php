@@ -16,6 +16,7 @@ use App\Services\Finance\IcInvoiceCalculator;
 use App\Services\Finance\InvoiceCalculatorRegistry;
 use App\Services\Finance\MatInvoiceCalculator;
 use App\Services\Finance\ReconciliationService;
+use App\Services\MailConfiguration;
 use App\Services\OperationalHeartbeat;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandFinished;
@@ -38,6 +39,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(MailConfiguration::class);
+        $this->app->resolving('mail.manager', fn () => app(MailConfiguration::class)->apply());
         $this->app->bind(DatabaseSnapshotWriter::class,
             ConfiguredSnapshotWriter::class);
         $this->app->bind(ReconciliationServiceInterface::class,
@@ -61,6 +64,7 @@ class AppServiceProvider extends ServiceProvider
         });
         Event::listen(JobProcessing::class,
             function (JobProcessing $event): void {
+                app(MailConfiguration::class)->apply();
                 if ($event->connectionName === config('queue.default')) {
                     app(OperationalHeartbeat::class)->publish('queue');
                 }

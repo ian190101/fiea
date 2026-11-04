@@ -25,6 +25,11 @@
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="FILESYSTEM_DISK" value="local"/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="FIEA_MAIL_PROVIDER" value="resend"/>
+        <env name="FIEA_EMAIL_QUEUE_ENABLED" value="true"/>
+        <env name="MAIL_HOST" value="smtp.example.test"/>
+        <env name="MAIL_USERNAME" value="usuario-de-prueba"/>
+        <env name="MAIL_PASSWORD" value="clave-sintetica-de-prueba"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

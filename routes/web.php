@@ -27,6 +27,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceEmailController;
 use App\Http\Controllers\InvoicePdfController;
 use App\Http\Controllers\LiquidGlassController;
+use App\Http\Controllers\MailSettingsController;
 use App\Http\Controllers\OperationStatusController;
 use App\Http\Controllers\OptionLookupController;
 use App\Http\Controllers\PaymentExpectationController;
@@ -172,6 +173,10 @@ Route::middleware(['auth', 'account.usable'])->group(function () {
     Route::get('/backups/{backup}/download', [BackupController::class, 'show'])->middleware(['permission:backups.view,backups.manage', 'password.confirm'])->name('backups.show');
 
     Route::get('/configuracion', [SystemSettingController::class, 'edit'])->middleware('permission:settings.manage')->name('system-settings.edit');
+    Route::post('/configuracion/correo', [MailSettingsController::class, 'update'])
+        ->middleware(['permission:settings.manage', 'password.confirm', 'throttle:5,1'])->name('mail-settings.update');
+    Route::post('/configuracion/correo/prueba', [MailSettingsController::class, 'test'])
+        ->middleware(['permission:settings.manage', 'password.confirm', 'throttle:5,1'])->name('mail-settings.test');
     Route::post('/configuracion', [SystemSettingController::class, 'update'])->middleware(['permission:settings.manage', 'password.confirm', 'throttle:10,1'])->name('system-settings.update');
 
     Route::get('/superadmin', [SuperadminController::class, 'index'])->middleware('permission:superadmin.manage')->name('superadmin.index');

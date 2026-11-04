@@ -414,6 +414,7 @@ class OperationHealthService
      */
     private function configuration(): array
     {
+        app(MailConfiguration::class)->apply();
         $missing = collect([
             'APP_KEY' => filled(config('app.key')),
             'APP_URL' => filled(config('app.url')),
@@ -449,8 +450,20 @@ class OperationHealthService
             $warnings[] = 'La clave independiente de respaldos debe estar configurada.';
         }
         if (app()->environment('production')
+            && config('services.transactional_mail.provider') === 'resend'
             && (int) config('services.resend.idempotency_window_seconds', 0) <= 60) {
             $warnings[] = 'Configura la ventana confirmada de idempotencia del proveedor de correo.';
+        }
+
+        if (app()->environment('production') && config('services.transactional_mail.provider') === 'smtp') {
+            if (config('mail.default') !== 'smtp' || ! filled(config('mail.mailers.smtp.host'))
+                || ! filled(config('mail.mailers.smtp.username')) || ! filled(config('mail.mailers.smtp.password'))
+                || ! config('mail.mailers.smtp.require_tls')) {
+                $warnings[] = 'Configura SMTP con credenciales y TLS obligatorio para todos los correos.';
+            }
+            if ((int) config('mail.invoice_dispatch_window_seconds') <= 60) {
+                $warnings[] = 'Configura un plazo de despacho SMTP mayor que 60 segundos.';
+            }
         }
 
         if (app()->environment('production') && config('queue.default') === 'sync') {

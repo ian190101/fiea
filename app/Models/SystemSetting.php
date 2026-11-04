@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SystemSetting extends Model
 {
+    protected $attributes = ['primary_color' => '#3960a3', 'secondary_color' => '#f78e3c', 'accent_color' => '#007145'];
+
     protected $fillable = [
         'logo_file_id',
         'primary_color',

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Actions\Settings\UpdateSystemSettings;
 use App\Http\Requests\UpdateSystemSettingsRequest;
 use App\Models\SystemSetting;
+use App\Services\BrandingAssetService;
 use App\Services\FileStorageService;
+use App\Services\MailConfiguration;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,10 +28,14 @@ class SystemSettingController extends Controller
                 'logo' => $settings->logoFile ? [
                     'id' => $settings->logoFile->id,
                     'original_name' => $settings->logoFile->original_name,
+                    'provider' => $settings->logoFile->provider,
+                    'public_url' => app(BrandingAssetService::class)->logoUrl(),
                 ] : null,
                 'updated_by' => $settings->updatedBy,
                 'updated_at' => $settings->updated_at,
             ],
+            'logoUrl' => app(BrandingAssetService::class)->logoUrl(),
+            'mailSettings' => app(MailConfiguration::class)->publicStatus(),
             'storageStatus' => Inertia::defer(fn () => $this->files->status(), 'settings'),
         ]);
     }

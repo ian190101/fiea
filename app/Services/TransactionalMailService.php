@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Exceptions\MailPreparationException;
 use App\Models\EmailLog;
 use App\Models\StorageFile;
+use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -18,10 +22,62 @@ class TransactionalMailService
      */
     public function sendInvoice(EmailLog $emailLog, array $to, array $cc = [], array $bcc = []): string
     {
+        app(MailConfiguration::class)->apply();
+
         return match ((string) config('services.transactional_mail.provider', 'resend')) {
             'resend' => $this->sendWithResend($emailLog, $to, $cc, $bcc),
+            'smtp' => $this->sendWithSmtp($emailLog, $to, $cc, $bcc),
             default => throw new MailPreparationException('Proveedor de correo transaccional no soportado.'),
         };
+    }
+
+    /**
+     * @param  array<int, string>  $to
+     * @param  array<int, string>  $cc
+     * @param  array<int, string>  $bcc
+     */
+    private function sendWithSmtp(EmailLog $emailLog, array $to, array $cc, array $bcc): string
+    {
+        try {
+            if (! filled(config('mail.mailers.smtp.host'))
+                || ! filled(config('mail.mailers.smtp.username'))
+                || ! filled(config('mail.mailers.smtp.password'))
+                || ! config('mail.mailers.smtp.require_tls')) {
+                throw new RuntimeException('SMTP requiere servidor, credenciales y TLS obligatorio.');
+            }
+            if (! $emailLog->delivery_key || ! $emailLog->recipients_snapshot || ! $emailLog->attachment_snapshot) {
+                throw new RuntimeException('El correo no tiene una preparación inmutable.');
+            }
+            $attachments = $this->attachments($emailLog);
+            $html = view('mail.invoice-prepared', [
+                'body' => $emailLog->body, 'invoice' => $emailLog->invoice,
+            ])->render();
+            $domain = substr(strrchr((string) config('mail.from.address'), '@') ?: '', 1);
+            $messageId = 'invoice-email-'.$emailLog->delivery_key.'@'.$domain;
+            $mailer = Mail::mailer('smtp');
+        } catch (\Throwable $exception) {
+            throw new MailPreparationException('La preparación local del correo no está disponible.', 0, $exception);
+        }
+
+        $sent = $mailer->html($html, function (Message $message) use ($emailLog, $to, $cc, $bcc, $attachments, $messageId): void {
+            $message->from((string) config('mail.from.address'), (string) config('mail.from.name'))
+                ->to($to)->subject($emailLog->subject);
+            if ($cc !== []) {
+                $message->cc($cc);
+            }
+            if ($bcc !== []) {
+                $message->bcc($bcc);
+            }
+            $message->getSymfonyMessage()->text($emailLog->body)
+                ->getHeaders()->addIdHeader('Message-ID', $messageId);
+            foreach ($attachments as $attachment) {
+                $message->attachData(base64_decode($attachment['content'], true), $attachment['filename'], [
+                    'mime' => $attachment['content_type'],
+                ]);
+            }
+        });
+
+        return $sent?->getMessageId() ?? '';
     }
 
     /**

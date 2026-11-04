@@ -1,4 +1,6 @@
 import LiquidSelect from '@/Components/Glass/LiquidSelect';
+import RemoteOptionSelect from '@/Components/RemoteOptionSelect';
+import { useOptionCollection } from '@/Utils/useOptionCollection';
 import { formatUsd as formatMoney, moneySign } from '@/Utils/money';
 import IconButton from '@/Components/IconButton';
 import InputError from '@/Components/InputError';
@@ -18,12 +20,13 @@ const recipientTypes = [
     { id: 'bcc', name: 'Con copia oculta' },
 ];
 
-export default function InvoiceEmailIndex({ invoices: invoicePage = [], defaultMessages = {}, templates = [], templateTokens = [], contacts = [], recommendedRecipients = {}, emailLogs = { data: [] }, automationSummary = {} }) {
+export default function InvoiceEmailIndex({ invoices: invoicePage = [], defaultMessages = {}, templates = [], templateTokens = [], recommendedRecipients = {}, emailLogs = { data: [] }, automationSummary = {} }) {
     const invoices = Array.isArray(invoicePage) ? invoicePage : (invoicePage?.data ?? []);
     const { flash } = usePage().props;
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id ?? '');
-    const [manualEmail, setManualEmail] = useState('');
-    const [manualType, setManualType] = useState('to');
+    const [selectedContactId, setSelectedContactId] = useState('');
+    const [contactType, setContactType] = useState('to');
+    const availableContacts = useOptionCollection([], 'invoice-contacts');
     const [editingTemplate, setEditingTemplate] = useState(null);
 
     const selectedInvoice = useMemo(
@@ -49,6 +52,7 @@ export default function InvoiceEmailIndex({ invoices: invoicePage = [], defaultM
     const changeInvoice = (invoiceId) => {
         const invoice = invoices.find((item) => String(item.id) === String(invoiceId));
         setSelectedInvoiceId(invoiceId);
+        setSelectedContactId('');
         form.clearErrors();
         form.setData({
             subject: invoice ? defaultMessages[invoice.id]?.subject ?? '' : '',
@@ -93,20 +97,6 @@ export default function InvoiceEmailIndex({ invoices: invoicePage = [], defaultM
             recipient_type: recipientType,
             label: contact.full_name,
         });
-    };
-
-    const addManualRecipient = () => {
-        if (!manualEmail.trim()) {
-            return;
-        }
-
-        addRecipient({
-            contact_person_id: null,
-            email: manualEmail.trim(),
-            recipient_type: manualType,
-            label: manualEmail.trim(),
-        });
-        setManualEmail('');
     };
 
     const addRecipient = (recipient) => {
@@ -240,26 +230,7 @@ export default function InvoiceEmailIndex({ invoices: invoicePage = [], defaultM
                                 <InputError message={form.errors.recipients} className="mt-2" />
                             </div>
 
-                            <div className="grid gap-3 sm:grid-cols-[1fr_90px]">
-                                <TextInput
-                                    value={manualEmail}
-                                    onChange={(event) => setManualEmail(event.target.value)}
-                                    placeholder="manual@example.com"
-                                    className="block w-full"
-                                />
-                                <LiquidSelect
-                                    value={manualType}
-                                    onChange={(event) => setManualType(event.target.value)}
-                                    className="rounded-xl border-app-border bg-white/70 text-app-text shadow-sm focus:border-brand-primary focus:ring-brand-primary dark:bg-stone-900/70"
-                                >
-                                    {recipientTypes.map((type) => (
-                                        <option key={type.id} value={type.id}>{type.name}</option>
-                                    ))}
-                                </LiquidSelect>
-                            </div>
-                            <button type="button" className="glass-button w-full px-4 py-2" onClick={addManualRecipient}>
-                                Agregar email manual
-                            </button>
+                            <p className="text-sm text-app-muted">Agrega los correos en Contactos y selecciona aquí a quién enviar esta factura.</p>
                         </div>
 
                         <div className="mt-6">
@@ -271,24 +242,25 @@ export default function InvoiceEmailIndex({ invoices: invoicePage = [], defaultM
 
                     <div className="space-y-6">
                         <div className="glass-panel rounded-[2rem] p-5">
-                            <h2 className="text-xl font-black">Contactos disponibles</h2>
-                            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                {contacts.map((contact) => (
-                                    <div key={contact.id} className="rounded-2xl bg-white/30 p-3 dark:bg-white/10">
-                                        <div className="font-black">{contact.full_name}</div>
-                                        <div className="truncate text-sm text-app-muted">{contact.email}</div>
-                                        <div className="mt-3 flex gap-2">
-                                            {recipientTypes.map((type) => (
-                                                <button key={type.id} type="button" className="glass-button px-3 py-1.5 text-xs" onClick={() => addContact(contact, type.id)}>
-                                                    {type.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                                {contacts.length === 0 && (
-                                    <p className="text-sm font-semibold text-app-muted">No hay contactos con correo registrado.</p>
-                                )}
+                            <h2 className="text-xl font-black">Seleccionar destinatario</h2>
+                            <p className="mt-2 text-sm text-app-muted">Busca contactos del equipo o capítulo de la factura. Puedes agregarlos como destinatario, copia o copia oculta.</p>
+                            <div className="mt-4 space-y-3">
+                                {selectedInvoice ? <>
+                                    <InputLabel htmlFor="invoice_contact" value="Contacto con correo registrado" />
+                                    <RemoteOptionSelect key={selectedInvoice.id} kind="invoice-contacts" id="invoice_contact"
+                                        remoteParams={{ invoice_id: selectedInvoice.id }} value={selectedContactId}
+                                        onChange={event => setSelectedContactId(event.target.value)} className="ios-field w-full">
+                                        <option value="">Selecciona un contacto</option>
+                                    </RemoteOptionSelect>
+                                    <SelectField id="contact_recipient_type" label="Enviar como" value={contactType} options={recipientTypes}
+                                        onChange={setContactType} />
+                                    <button type="button" className="glass-button w-full px-4 py-2" disabled={!selectedContactId}
+                                        onClick={() => {
+                                            const contact = availableContacts.find(row => String(row.id) === String(selectedContactId));
+                                            if (contact) addContact(contact, contactType);
+                                        }}>Agregar contacto al correo</button>
+                                </> : <p className="text-sm text-app-muted">Selecciona una factura para buscar sus contactos.</p>}
+                                <Link href={route('contacts.index')} className="inline-block text-sm font-semibold underline">Administrar contactos y correos</Link>
                             </div>
                         </div>
 
@@ -548,12 +520,16 @@ function EmailStatusBadge({ status }) {
         queued: 'bg-sky-400/20 text-sky-800 dark:text-sky-100',
         sent: 'bg-emerald-400/20 text-emerald-800 dark:text-emerald-100',
         failed: 'bg-red-400/20 text-red-800 dark:text-red-100',
+        unknown: 'bg-amber-400/20 text-amber-800 dark:text-amber-100',
+        expired: 'bg-stone-400/20 text-stone-800 dark:text-stone-100',
     };
     const labels = {
         pending: 'Pendiente',
         queued: 'En cola',
         sent: 'Enviado',
         failed: 'Fallido',
+        unknown: 'Requiere revisión del envío',
+        expired: 'Plazo de envío vencido',
     };
 
     return (

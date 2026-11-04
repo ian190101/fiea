@@ -51,6 +51,8 @@ class InvoiceEmailDeliveryService
         try {
             $emailLog->forceFill([
                 'last_attempted_at' => now(),
+                // SMTP no deduplica: si el proceso se interrumpe, se exige revisión antes de reenviar.
+                'status' => config('services.transactional_mail.provider') === 'smtp' ? 'unknown' : $emailLog->status,
             ])->save();
 
             $providerMessageId = $this->mail->sendInvoice(
